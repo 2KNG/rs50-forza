@@ -25,11 +25,11 @@ def be16(p):
 SETTINGS = {
     0x8136: ("FFB 강도", lambda p: f"{be16(p)/8192:.1f} Nm (raw {be16(p):#06x})",
              lambda nm: bytes([int(nm*8191.875) >> 8, int(nm*8191.875) & 0xFF, 0]),
-             "6.0 Nm 권장 (최대 8.0)",
-             lambda p: be16(p)/8192 < 2.0 and "강도가 2Nm 미만 — '가볍다'의 직접 원인 후보"),
+             "8.0 Nm (베이스 최대, 세기는 게임 스케일로)",
+             lambda p: be16(p)/8192 < 4.0 and "강도 낮음 — '가볍다'에 기여 가능"),
     0x8139: ("TRUEFORCE", lambda p: f"{be16(p)/655.35:.0f}% (raw {be16(p):#06x})",
              lambda pct: bytes([int(pct*655.35) >> 8, int(pct*655.35) & 0xFF, 0]),
-             "30~50% 권장",
+             "FH6 네이티브 미지원 — 체감 무관 (TF4ALL 전용)",
              lambda p: None),
     0x8133: ("댐핑", lambda p: f"{be16(p)/655.35:.0f}%",
              lambda pct: bytes([int(pct*655.35) >> 8, int(pct*655.35) & 0xFF, 0]),
@@ -47,7 +47,7 @@ SETTINGS = {
 }
 
 SET_FN = {0x8136: 2, 0x8139: 3, 0x8133: 1, 0x8138: 2}
-RECOMMENDED = {0x8136: 6.0, 0x8139: 40, 0x8133: 20, 0x8138: 900}
+RECOMMENDED = {0x8136: 8.0, 0x8133: 0, 0x8138: 900}
 
 
 def read_all(dev):
@@ -100,28 +100,22 @@ def fix(dev):
 
 
 GUIDE = """
-=== 실주행 FFB 격리 시퀀스 (각 단계 30초~1분 주행 후 Enter) ===
+=== 실주행 FFB 시퀀스 (상세는 FFB_DEBUG.md) ===
 
-[사전] 게임 설정 > 조작 > 고급 휠 설정 확인:
-  - 포스 피드백 스케일 100 이상 / 자가 정렬 토크(SAT) 100 / 데드존 0-100 대칭
-  - '진동 스케일'과 '포스 피드백'이 0으로 초기화되어 있지 않은지 (오염 흔적)
+0. G HUB: 펌웨어 업데이트 확인(2025-12에 FFB사망 픽스) + Calibrate(정중앙 잡고)
+   -> 베이스 전원 재인입
+1. 다른 USB 입력장치 전부 분리, 게임에서 스티어링 리바인드 -> "Device 1" 확인
+   (FH6는 Device 1에만 FFB를 보냄 — '가벼움'의 1순위 원인)
+2. 게임 내: FFB Scale 0.75-0.8 / Center Spring 0 / Min Force 0 /
+   데드존 0/100 / Linearity 40-50 / 모드 Normal
+3. 앱 없이 주행 테스트
+   - 가벼움 지속 -> Forza InputTranslationManager 프로파일 삭제 후 재작성
+   - 쏠림 지속 -> 인카 상태 USB 재연결 (센터스프링 버그)
+   - 조향 방향으로 빨림 -> Invert Force Feedback 토글
+4. python -m src.main (LED 없이) -> start.bat (전체) 순서로 격리
+5. 남으면: USB 선택적 절전 OFF, HidHide/DSX 확인
 
-1단계: 우리 앱 완전 종료 + G HUB 실행 상태로 주행
-  -> 여기서도 가볍거나 쏠리면: 원인은 우리 앱이 아님 (게임/GHUB/휠 설정)
-2단계: (1이 정상일 때) 앱을 LED 없이 실행: python -m src.main
-  -> 이상해지면: 키 인젝션/HID 읽기 경로 문제 (가능성 낮음, 보고 요망)
-3단계: (2가 정상일 때) 전체 실행: start.bat
-  -> 이상해지면: LED HID++ 트래픽이 원인 -> config update_hz를 6으로 낮춰 재시도
-4단계: 쏠림(특히 우측)이 계속되면:
-  - 정차 후 휠에서 손 떼고 스티어링이 스스로 한쪽으로 도는지 관찰
-    돌면 = 센터 캘리브레이션 틀어짐 -> G HUB > 휠 설정 > 센터 재설정
-    (또는 휠 베이스 OLED 메뉴 > Calibration)
-  - 게임 내 데드존 좌우 비대칭 확인
-  - TrueForce는 오디오 기반이라 좌우 오디오 밸런스가 틀어져 있으면 쏠림 유발
-    -> 윈도우 사운드 밸런스 L/R 50:50 확인
-5단계: 여전히 가볍다면 python tools/ffb_doctor.py 로 강도 재확인 후 --fix
-
-각 단계 결과를 저한테 그대로 알려주시면 다음 수를 바로 드립니다.
+각 단계 결과를 알려주면 다음 수를 바로 드립니다.
 """
 
 
