@@ -24,12 +24,20 @@ PAGE = r"""<!doctype html>
 html,body{height:100%}
 body{background:var(--bg);color:var(--tx);padding:calc(var(--u)*1.4);
      display:flex;flex-direction:column;gap:calc(var(--u)*1.2);transition:background .3s}
+/* 레드라인 앰비언트 글로우 + 시프트 플래시 오버레이 */
+#ambient{position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0;
+  background:radial-gradient(ellipse at 50% 110%,rgba(255,59,59,.32),transparent 60%)}
+#flash{position:fixed;inset:0;pointer-events:none;z-index:1;opacity:0;
+  box-shadow:inset 0 0 calc(var(--u)*14) calc(var(--u)*2) var(--pur)}
+header,main{position:relative;z-index:2}
 header{display:flex;align-items:center;gap:calc(var(--u)*1.2);flex-wrap:wrap}
 .brand{font-weight:800;letter-spacing:2px;font-size:calc(var(--u)*1.3);color:var(--dim)}
 .badge{font-size:calc(var(--u)*1.4);font-weight:800;letter-spacing:2px;
        padding:calc(var(--u)*.6) calc(var(--u)*1.4);border-radius:calc(var(--u)*.7)}
 .badge.auto{background:#0d2d18;color:var(--grn);border:1px solid #1d5c33}
-.badge.manual{background:#332309;color:var(--amb);border:1px solid #6b4d15}
+.badge.manual{background:#332309;color:var(--amb);border:1px solid #6b4d15;
+  animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 calc(var(--u)*1.2) rgba(255,176,32,.55)}}
 .badge.off{background:#22262e;color:var(--dim);border:1px solid var(--line)}
 .dot{width:calc(var(--u)*.8);height:calc(var(--u)*.8);border-radius:50%;background:#444}
 .dot.on{background:var(--grn);box-shadow:0 0 calc(var(--u)*.8) var(--grn)}
@@ -83,8 +91,10 @@ body[data-display=analog] #gear{font-size:0}
 .events h3{font-size:calc(var(--u)*1);color:var(--dim);letter-spacing:2px;
            margin-bottom:calc(var(--u)*.6)}
 .log{overflow-y:auto;flex:1;font:calc(var(--u)*1.15)/1.7 Consolas,monospace}
-.log div{color:var(--dim);border-bottom:1px solid var(--logline);padding:2px 4px}
+.log div{color:var(--dim);border-bottom:1px solid var(--logline);padding:2px 4px;
+  animation:fadein .35s ease}
 .log div b{color:var(--tx);font-weight:600}
+@keyframes fadein{from{opacity:0;transform:translateY(-4px)}to{opacity:1}}
 /* 세로 화면(폰): vw 기반이 좁아지므로 vh 쪽으로 단위 재조정 */
 @media (orientation:portrait){
   :root{--u:min(2.2vw,1.4vh)}
@@ -146,6 +156,7 @@ body[data-theme=neon] .led{border-radius:calc(var(--u)*.9);
 body[data-theme=neon] .panel{box-shadow:0 0 calc(var(--u)*2.2) rgba(59,26,110,.35)}
 </style></head>
 <body data-theme="pit" data-display="digital">
+<div id="ambient"></div><div id="flash"></div>
 <header>
   <span class="brand">RS50 × FH6</span>
   <span class="badge off" id="mode">대기</span>
@@ -163,7 +174,8 @@ body[data-theme=neon] .panel{box-shadow:0 0 calc(var(--u)*2.2) rgba(59,26,110,.3
       <path id="redzone" fill="none" stroke="#ff3b3b" stroke-width="6" opacity=".8"/>
       <line id="needle" x1="100" y1="100" x2="100" y2="24"
             stroke-width="3.5" stroke-linecap="round"
-            style="transform-origin:100px 100px;transition:transform .1s linear"/>
+            style="transform-origin:100px 100px;
+                   filter:drop-shadow(0 0 3px rgba(0,0,0,.6))"/>
       <circle id="hub" cx="100" cy="100" r="7"/>
       <text id="gunit" x="100" y="168" text-anchor="middle"
             font-size="9" letter-spacing="2">RPM ×1000</text>
@@ -226,42 +238,80 @@ for(let i=0;i<=10;i++){
 $('redzone').setAttribute('d',`M ${100+r*Math.sin(a0)} ${100-r*Math.cos(a0)}
  A ${r} ${r} 0 0 1 ${100+r*Math.sin(a1)} ${100-r*Math.cos(a1)}`);})();
 
+/* ===== 서버 폴링(150ms, 목표값) + rAF 60fps 보간 렌더 ===== */
+let T={ratio:0,rpm:0,speed_kmh:0,max_rpm:0,alive:false,gear:null,mode:'AUTO',
+       start_ratio:.5,blink_ratio:.95,events:[]};
+let D={ratio:0,rpm:0,speed:0};              // 표시용(보간된) 값
 let lastEvents='', lastGear=null;
-async function tick(){
+
+async function poll(){
   try{
-    const s=await (await fetch('/state')).json();
-    const gtxt = s.gear===0?'R':(s.gear>10?'N':(s.gear||'-'));
+    T=await (await fetch('/state')).json();
+    /* 이산 값들은 폴링 시점에 즉시 반영 */
+    const gtxt=T.gear===0?'R':(T.gear>10?'N':(T.gear||'-'));
     if(gtxt!==lastGear){
       for(const el of [$('gear'),$('gearA')]){
-        el.classList.add('pop');setTimeout(()=>el.classList.remove('pop'),120);
+        el.classList.add('pop');setTimeout(()=>el.classList.remove('pop'),140);
       }
       lastGear=gtxt;
     }
     $('gear').textContent=gtxt; $('gearA').textContent=gtxt;
-    $('speed').textContent=Math.round(s.speed_kmh);
-    $('rpm').textContent=Math.round(s.rpm);
-    $('maxrpm').textContent=Math.round(s.max_rpm);
-    $('ratio').textContent=Math.round(s.ratio*100)+'%';
+    $('maxrpm').textContent=Math.round(T.max_rpm);
     const b=$('mode');
-    if(!s.alive){b.textContent='대기';b.className='badge off';}
-    else if(s.mode==='AUTO'){b.textContent='AUTO';b.className='badge auto';}
+    if(!T.alive){b.textContent='대기';b.className='badge off';}
+    else if(T.mode==='AUTO'){b.textContent='AUTO';b.className='badge auto';}
     else{b.textContent='MANUAL';b.className='badge manual';}
-    $('teldot').className='dot'+(s.alive?' on':'');
-    const lit=s.ratio<=s.start_ratio?0:
-      Math.min(N,Math.max(1,Math.round((s.ratio-s.start_ratio)/(s.blink_ratio-s.start_ratio)*N)));
-    const blink=s.alive&&s.ratio>=s.blink_ratio&&(Date.now()>>6)%2===0;
-    leds.forEach((el,i)=>{
-      if(blink){el.style.background='var(--pur)';el.style.boxShadow='0 0 16px var(--pur)';}
-      else if(s.alive&&i<lit){el.style.background=SEG[i];el.style.boxShadow='0 0 10px '+SEG[i];}
-      else{el.style.background='var(--seg-off)';el.style.boxShadow='none';}
-    });
-    $('shift').textContent=(s.alive&&s.ratio>=s.blink_ratio)?'SHIFT ▲':'';
-    $('needle').style.transform=`rotate(${-120+Math.min(1,Math.max(0,s.ratio))*240}deg)`;
-    const ev=s.events.map(e=>`<div><b>${e[0]}</b> ${e[1]}</div>`).reverse().join('');
+    $('teldot').className='dot'+(T.alive?' on':'');
+    const ev=T.events.map(e=>`<div><b>${e[0]}</b> ${e[1]}</div>`).reverse().join('');
     if(ev!==lastEvents){$('log').innerHTML=ev;lastEvents=ev;}
   }catch(e){}
 }
-setInterval(tick,150); tick();
+setInterval(poll,150); poll();
+
+let lastRender=0;
+function render(ts){
+  lastRender=performance.now();
+  const k=0.16;                             // 보간 계수 (부드러움)
+  D.ratio+=( (T.alive?T.ratio:0) - D.ratio)*k;
+  D.rpm  +=( (T.alive?T.rpm:0)   - D.rpm)*k;
+  D.speed+=( (T.alive?T.speed_kmh:0) - D.speed)*k;
+
+  $('rpm').textContent=Math.round(D.rpm);
+  $('speed').textContent=Math.round(D.speed);
+  $('ratio').textContent=Math.round(D.ratio*100)+'%';
+  $('needle').style.transform=`rotate(${-120+Math.min(1,Math.max(0,D.ratio))*240}deg)`;
+
+  const t=ts/1000;
+  const overRev=T.alive&&T.ratio>=T.blink_ratio;
+  const blinkOn=overRev&&Math.floor(t*10)%2===0;
+
+  if(!T.alive){
+    /* 아이들: 물리 휠과 동일한 파란 물결 미러 (ledctl._wave_frame 공식) */
+    leds.forEach((el,i)=>{
+      const ph=Math.sin(2*Math.PI*(t*0.8-i/N*1.4));
+      const br=0.06+0.55*Math.max(0,ph)**2;
+      el.style.background=`rgba(59,108,255,${(br*1.4).toFixed(2)})`;
+      el.style.boxShadow=br>0.3?`0 0 ${Math.round(br*14)}px rgba(59,108,255,.7)`:'none';
+    });
+  }else{
+    const lit=D.ratio<=T.start_ratio?0:
+      Math.min(N,Math.max(1,Math.round((D.ratio-T.start_ratio)/(T.blink_ratio-T.start_ratio)*N)));
+    leds.forEach((el,i)=>{
+      if(blinkOn){el.style.background='var(--pur)';el.style.boxShadow='0 0 16px var(--pur)';}
+      else if(overRev){el.style.background='var(--seg-off)';el.style.boxShadow='none';}
+      else if(i<lit){el.style.background=SEG[i];el.style.boxShadow='0 0 10px '+SEG[i];}
+      else{el.style.background='var(--seg-off)';el.style.boxShadow='none';}
+    });
+  }
+  $('shift').textContent=overRev?'SHIFT ▲':'';
+  /* 레드라인 앰비언트 + 시프트 플래시 */
+  $('ambient').style.opacity=T.alive?Math.max(0,(D.ratio-0.75)/0.25*0.9).toFixed(2):0;
+  $('flash').style.opacity=blinkOn?0.85:0;
+}
+function loop(ts){render(ts);requestAnimationFrame(loop);}
+requestAnimationFrame(loop);
+/* rAF가 멎는 환경(백그라운드 탭/일부 렌더러) 폴백 — 250ms 간격으로 render 구동 */
+setInterval(()=>{if(performance.now()-lastRender>200)render(performance.now());},250);
 </script></body></html>"""
 
 
