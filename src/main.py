@@ -72,47 +72,80 @@ class LedThread(threading.Thread):
             time.sleep(0.02)
 
 
+def validate_config(cfg):
+    if "telemetry" not in cfg or "port" not in cfg["telemetry"]:
+        sys.exit("[config] [telemetry].port 누락 — config.toml 확인")
+    sk = cfg.get("shift_keys", {})
+    if "up" not in sk or "down" not in sk:
+        sys.exit("[config] [shift_keys] up/down 누락 — config.toml 확인")
+    lcfg = cfg.get("led", {})
+    if lcfg.get("update_hz", 10) <= 0:
+        sys.exit("[config] [led].update_hz 는 1 이상이어야 함")
+
+
 def main():
-    cfg = load_config()
+    try:
+        cfg = load_config()
+    except FileNotFoundError:
+        sys.exit(f"config.toml 없음 — 예상 경로: {Path(__file__).resolve().parent.parent / 'config.toml'}")
+    validate_config(cfg)
 
     state = TelemetryState()
-    listener = TelemetryListener(cfg["telemetry"]["port"], state)
+    try:
+        listener = TelemetryListener(cfg["telemetry"]["port"], state, log=log)
+    except RuntimeError as e:
+        sys.exit(str(e))
     listener.start()
     log(f"텔레메트리 수신 대기: UDP {cfg['telemetry']['port']}")
 
     shifter = Shifter(cfg["shift_keys"]["up"], cfg["shift_keys"]["down"],
-                      cfg["shift_keys"].get("press_ms", 30))
+                      cfg["shift_keys"].get("press_ms", 30),
+                      focus_guard=cfg["shift_keys"].get("focus_guard", "forza"))
     fsm_cfg = {**cfg.get("auto", {}), **cfg.get("override", {})}
     fsm = AutoShiftFSM(state, shifter, fsm_cfg, log=log)
 
+    watcher = None
     pcfg = cfg.get("paddles", {})
-    if pcfg.get("byte_up") is not None:
-        watcher = PaddleWatcher(pcfg["byte_up"], pcfg["bit_up"],
-                                pcfg["byte_down"], pcfg["bit_down"],
-                                on_paddle=fsm.on_paddle, on_hold=fsm.on_hold,
-                                hold_s=cfg.get("override", {}).get("hold_to_auto_s", 2.0))
-        watcher.start()
-        log("패들 관찰 시작 (패들=수동 / 업패들 홀드·타임아웃=자동복귀)")
+    pkeys = ("byte_up", "bit_up", "byte_down", "bit_down")
+    missing = [k for k in pkeys if pcfg.get(k) is None]
+    if not missing:
+        try:
+            watcher = PaddleWatcher(pcfg["byte_up"], pcfg["bit_up"],
+                                    pcfg["byte_down"], pcfg["bit_down"],
+                                    on_paddle=fsm.on_paddle, on_hold=fsm.on_hold,
+                                    hold_s=cfg.get("override", {}).get("hold_to_auto_s", 2.0),
+                                    log=log)
+            watcher.start()
+            log("패들 관찰 시작 (패들=수동 / 업패들 홀드·타임아웃=자동복귀)")
+        except RuntimeError as e:
+            log(f"[경고] 패들 관찰 불가 ({e}) — AUTO 전용 동작")
+    elif len(missing) < len(pkeys):
+        log(f"[경고] [paddles] 불완전 ({', '.join(missing)} 누락) — AUTO 전용 동작")
     else:
         log("[경고] [paddles] 미설정 — tools/paddle_map.py 로 실측 후 기입 (AUTO 전용 동작)")
 
     led = led_thread = None
     lcfg = cfg.get("led", {})
     if "--led" in sys.argv:
-        from src.ledctl import Rs50Led
-        led = Rs50Led(slot=0, min_interval=1.0 / lcfg.get("update_hz", 10),
-                      preset=lcfg.get("preset", "f1"),
-                      keepalive=None,
-                      fast=lcfg.get("fast_updates", True))
+        # LED 초기화 실패(휠 절전/부재/응답 없음)해도 앱은 변속 기능으로 계속 동작
         try:
-            _, b5, _ = led.read_slot(0)
-            led.direction = b5  # 슬롯 0 고유 byte5 유지
-        except Exception:
-            pass
-        led.write_frame(led.frame_for_ratio(0))  # 풀 시퀀스 1회: 표시 상태 정렬
-        led_thread = LedThread(led, state, lcfg)
-        led_thread.start()
-        log("LED rev-light 활성 (슬롯 0 직접, 변화시에만 전송, G HUB 공존)")
+            from src.ledctl import Rs50Led
+            led = Rs50Led(slot=0, min_interval=1.0 / lcfg.get("update_hz", 10),
+                          preset=lcfg.get("preset", "f1"),
+                          keepalive=None,
+                          fast=lcfg.get("fast_updates", True))
+            try:
+                _, b5, _ = led.read_slot(0)
+                led.direction = b5  # 슬롯 0 고유 byte5 유지
+            except Exception:
+                pass
+            led.write_frame(led.frame_for_ratio(0))  # 풀 시퀀스 1회: 표시 상태 정렬
+            led_thread = LedThread(led, state, lcfg)
+            led_thread.start()
+            log("LED rev-light 활성 (슬롯 0 직접, 변화시에만 전송, G HUB 공존)")
+        except Exception as e:
+            led = led_thread = None
+            log(f"[LED] 초기화 실패 ({e}) — LED 없이 계속 진행")
 
     wcfg = cfg.get("web", {})
     if wcfg.get("enabled", True):
@@ -132,9 +165,16 @@ def main():
 
     print("실행 중... Ctrl+C로 종료")
     last_hb = 0.0
+    last_tick_err = 0.0
     try:
         while True:
-            fsm.tick()
+            try:
+                fsm.tick()
+            except Exception as e:
+                now = time.time()
+                if now - last_tick_err > 5:
+                    log(f"[FSM] 오류(계속 진행): {e}")
+                    last_tick_err = now
             now = time.time()
             if now - last_hb >= 30:
                 last_hb = now
@@ -145,14 +185,20 @@ def main():
         pass
     finally:
         listener.stop()
+        if watcher is not None:
+            watcher.stop()
+            watcher.join(timeout=1.0)
         if led_thread is not None:
             led_thread.stop()
-            led_thread.join(timeout=1.0)
+            led_thread.join(timeout=2.0)
+        if led is not None:
             try:
                 # 종료 시 풀 F1 그라데이션을 정적으로 남김 (주차 상태 표시)
                 led.write_frame(led.frame_for_ratio(1.0, mode="ltr"))
             except Exception:
                 pass
+            led.dev.close()
+        listener.join(timeout=1.0)
 
 
 if __name__ == "__main__":

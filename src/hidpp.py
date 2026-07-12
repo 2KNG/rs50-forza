@@ -7,6 +7,7 @@
 
 G HUB 실행 중에도 병렬 오픈/통신 가능 (Windows HID 공유 모드).
 """
+import threading
 import time
 
 import hid
@@ -32,6 +33,7 @@ class Rs50Hidpp:
         self.h_vlong = self._open(0x704)
         self.h_vlong.set_nonblocking(True)
         self._feat_cache = {}
+        self._lock = threading.Lock()  # 다중 스레드(LED/종료 경로) 트랜잭션 직렬화
 
     @staticmethod
     def _open(usage):
@@ -65,6 +67,17 @@ class Rs50Hidpp:
         fn_only = func_sw & 0xF0
         def match_fs(b):
             return b == func_sw or b == fn_only
+
+        with self._lock:
+            return self._transact(h_tx, req, feat_idx, func_sw, match_fs,
+                                  timeout, retries, func)
+
+    def _transact(self, h_tx, req, feat_idx, func_sw, match_fs, timeout,
+                  retries, func):
+        # 이전 타임아웃의 지각 응답이 다음 호출에 오매칭되지 않도록 드레인
+        for _ in range(32):
+            if not self.h_vlong.read(64):
+                break
 
         last_err = "timeout"
         for _ in range(retries):

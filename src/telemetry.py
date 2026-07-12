@@ -1,10 +1,8 @@
 """Forza Data Out UDP 텔레메트리 수신/파싱.
 
 패킷 크기로 포맷을 자동 판별한다:
-  232B = Sled, 311B = Motorsport Dash, 324B = Horizon(FH4/FH5) Dash
-FH6 포맷은 리서치 확정 후 필요 시 테이블 추가/수정.
-[주의] 324B 테이블의 dash 구간 오프셋은 커뮤니티 문서 기반 —
-tools/telemetry_dump.py 로 실차 값과 대조해 검증할 것.
+  232B = Sled, 311B = Motorsport Dash, 324B = Horizon(FH4/FH5/FH6) Dash
+알 수 없는 크기는 상태를 오염시키지 않도록 통째로 무시한다(1회 경고).
 """
 import socket
 import struct
@@ -27,12 +25,13 @@ _DASH_TABLES = {
         "accel": (303, "<B"), "brake": (304, "<B"), "clutch": (305, "<B"),
         "handbrake": (306, "<B"), "gear": (307, "<B"), "steer": (308, "<b"),
     },
-    324: {  # Horizon (FH4/FH5): sled 뒤에 12B unknown 삽입 -> dash 구간 +12
+    324: {  # Horizon (FH4/FH5/FH6): sled 뒤 12B(CarGroup 등) -> dash 구간 +12
         "speed": (256, "<f"), "power": (260, "<f"), "torque": (264, "<f"),
         "accel": (315, "<B"), "brake": (316, "<B"), "clutch": (317, "<B"),
         "handbrake": (318, "<B"), "gear": (319, "<B"), "steer": (320, "<b"),
     },
 }
+_KNOWN_SIZES = {232} | set(_DASH_TABLES)
 
 
 class TelemetryState:
@@ -67,32 +66,47 @@ class TelemetryState:
 
 
 class TelemetryListener(threading.Thread):
-    def __init__(self, port, state: TelemetryState):
+    def __init__(self, port, state: TelemetryState, log=print):
         super().__init__(daemon=True, name="telemetry")
-        self.port = port
         self.state = state
+        self.log = log
         self._stop = threading.Event()
+        self._warned_sizes = set()
+        # 바인드는 스레드 시작 전에 — 포트 점유 시 조용히 죽지 않고 즉시 실패
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            self.sock.bind(("127.0.0.1", port))
+        except OSError as e:
+            self.sock.close()
+            raise RuntimeError(
+                f"UDP {port} 바인드 실패 ({e}) — 다른 인스턴스/SimHub가 점유 중이거나 "
+                f"config.toml [telemetry].port 변경 필요") from e
+        self.sock.settimeout(0.5)
 
     def stop(self):
         self._stop.set()
 
     def run(self):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.bind(("127.0.0.1", self.port))
-        sock.settimeout(0.5)
         s = self.state
         while not self._stop.is_set():
             try:
-                data, _ = sock.recvfrom(1024)
+                data, _ = self.sock.recvfrom(1024)
             except socket.timeout:
                 continue
+            except OSError:
+                break  # 소켓이 닫힘 (종료 경로)
             n = len(data)
+            if n not in _KNOWN_SIZES:
+                if n not in self._warned_sizes:
+                    self._warned_sizes.add(n)
+                    self.log(f"[telemetry] 알 수 없는 패킷 크기 {n}B — 무시 "
+                             f"(포맷 테이블 추가 필요)")
+                continue
             fields = dict(_SLED)
             fields.update(_DASH_TABLES.get(n, {}))
             for name, (off, fmt) in fields.items():
                 if off + struct.calcsize(fmt) <= n:
-                    setattr(s, {"is_race_on": "is_race_on"}.get(name, name),
-                            struct.unpack_from(fmt, data, off)[0])
+                    setattr(s, name, struct.unpack_from(fmt, data, off)[0])
             s.packet_size = n
             s.last_rx = time.time()
-        sock.close()
+        self.sock.close()
