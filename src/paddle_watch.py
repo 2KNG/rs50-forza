@@ -62,8 +62,8 @@ class PaddleWatcher(threading.Thread):
 
     def run(self):
         prev_up = prev_down = False
-        up_since = None
-        hold_fired = False
+        since = {"up": None, "down": None}      # 눌림 시작 시각
+        fired = {"up": False, "down": False}    # 홀드 콜백 발화 여부
         while not self._stop.is_set():
             now = time.time()
             try:
@@ -73,7 +73,7 @@ class PaddleWatcher(threading.Thread):
                 if not self._reconnect():
                     break
                 prev_up = prev_down = False
-                up_since = None
+                since = {"up": None, "down": None}
                 continue
             if data:
                 need = max(self.byte_up, self.byte_down)
@@ -82,32 +82,31 @@ class PaddleWatcher(threading.Thread):
                 up = bool(data[self.byte_up] & (1 << self.bit_up))
                 down = bool(data[self.byte_down] & (1 << self.bit_down))
                 try:
-                    if up and not prev_up:
-                        self.last_paddle_time = now
-                        up_since = now
-                        hold_fired = False
-                        if self.on_paddle:
-                            self.on_paddle("up")
-                    if not up:
-                        up_since = None
-                        hold_fired = False
-                    if down and not prev_down:
-                        self.last_paddle_time = now
-                        if self.on_paddle:
-                            self.on_paddle("down")
+                    for name, cur, prev in (("up", up, prev_up),
+                                            ("down", down, prev_down)):
+                        if cur and not prev:
+                            self.last_paddle_time = now
+                            since[name] = now
+                            fired[name] = False
+                            if self.on_paddle:
+                                self.on_paddle(name)
+                        if not cur:
+                            since[name] = None
+                            fired[name] = False
                 except Exception as e:
                     self.log(f"[paddle] 콜백 오류(계속 진행): {e}")
                 prev_up, prev_down = up, down
             else:
                 time.sleep(0.001)
             # 홀드 판정 (리포트 유무와 무관하게 마지막 상태 기준)
-            if (up_since is not None and not hold_fired
-                    and now - up_since >= self.hold_s):
-                hold_fired = True
-                try:
-                    if self.on_hold:
-                        self.on_hold("up")
-                except Exception as e:
-                    self.log(f"[paddle] 홀드 콜백 오류: {e}")
+            for name in ("up", "down"):
+                if (since[name] is not None and not fired[name]
+                        and now - since[name] >= self.hold_s):
+                    fired[name] = True
+                    try:
+                        if self.on_hold:
+                            self.on_hold(name)
+                    except Exception as e:
+                        self.log(f"[paddle] 홀드 콜백 오류: {e}")
         if self._h:
             self._h.close()

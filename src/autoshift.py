@@ -27,11 +27,13 @@ class AutoShiftFSM:
         self.min_interval = cfg.get("min_shift_interval_s", 0.6)
         self.max_gear = cfg.get("max_gear", 8)
         self._last_shift = 0.0
+        self.reverse_max_kmh = cfg.get("reverse_max_kmh", 15.0)
         self._pending_gear = None   # 직전 명령의 기대 기어 (반영 확인 전 재발사 방지)
         self._pending_from = None
         self._up_fails = {}         # gear -> 연속 미반영 횟수 (실질 톱기어 학습)
         self._top_gear = None
         self._last_max_rpm = 0.0
+        self._reverse_until = 0.0   # 후진 진입 시퀀스 데드라인 (0=비활성)
 
     def on_paddle(self, direction):
         """PaddleWatcher 콜백 (패들 눌림 에지)."""
@@ -41,11 +43,22 @@ class AutoShiftFSM:
             self.log(f"[FSM] -> MANUAL_OVERRIDE (패들 {direction})")
 
     def on_hold(self, direction):
-        """시프트업 패들 장시간 홀드 -> 즉시 AUTO 복귀 (실차 +패들 홀드 방식)."""
-        if direction == "up" and self.mode == MANUAL:
-            self.mode = AUTO
-            self._last_shift = time.time()  # 복귀 직후 즉발 변속 방지
-            self.log("[FSM] -> AUTO (시프트업 패들 홀드)")
+        """패들 장시간 홀드: 업=즉시 AUTO 복귀, 다운=후진 진입 시퀀스."""
+        if direction == "up":
+            if self.mode == MANUAL:
+                self.mode = AUTO
+                self._last_shift = time.time()  # 복귀 직후 즉발 변속 방지
+                self.log("[FSM] -> AUTO (시프트업 패들 홀드)")
+        elif direction == "down":
+            t = self.t
+            if not t.alive or t.gear == 0:
+                return
+            if t.speed * 3.6 > self.reverse_max_kmh:
+                self.log(f"[FSM] 후진 거부 — 속도 {t.speed*3.6:.0f}km/h "
+                         f"(한계 {self.reverse_max_kmh:.0f})")
+                return
+            self._reverse_until = time.time() + 2.5
+            self.log("[FSM] 후진 진입 시퀀스 (다운패들 홀드)")
 
     def _resolve_pending(self, now, gear):
         """직전 변속 명령의 반영 여부 확인. 반환: True=변속 판단 진행 가능."""
@@ -72,6 +85,21 @@ class AutoShiftFSM:
     def tick(self):
         """메인 루프에서 주기 호출 (~60Hz)."""
         now = time.time()
+
+        # 후진 진입 시퀀스: R(기어 0) 도달까지 0.25s 간격 다운시프트
+        if self._reverse_until:
+            t = self.t
+            if t.gear == 0:
+                self._reverse_until = 0.0
+                self.log("[FSM] 후진(R) 진입 완료")
+            elif now > self._reverse_until or not t.alive \
+                    or t.speed * 3.6 > self.reverse_max_kmh + 5:
+                self._reverse_until = 0.0
+                self.log("[FSM] 후진 시퀀스 중단")
+            elif now - self._last_shift >= 0.25:
+                if self.shifter.down():
+                    self._last_shift = now
+            return
 
         if self.mode == MANUAL:
             if now - self.last_paddle >= self.timeout_s:
