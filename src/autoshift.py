@@ -38,27 +38,42 @@ class AutoShiftFSM:
     def on_paddle(self, direction):
         """PaddleWatcher 콜백 (패들 눌림 에지)."""
         self.last_paddle = time.time()
+        # 수동 개입 -> 진행 중이던 자동 동작의 기대를 전부 무효화
+        if direction == "up" and self._reverse_until:
+            self._reverse_until = 0.0
+            self.log("[FSM] 후진 시퀀스 취소 (업패들)")
+        self._pending_gear = self._pending_from = None
         if self.mode != MANUAL:
             self.mode = MANUAL
             self.log(f"[FSM] -> MANUAL_OVERRIDE (패들 {direction})")
 
     def on_hold(self, direction):
-        """패들 장시간 홀드: 업=즉시 AUTO 복귀, 다운=후진 진입 시퀀스."""
+        """패들 장시간 홀드: 업=즉시 AUTO 복귀, 다운=후진 진입 시퀀스.
+
+        반환 False = 조건 미충족(홀드 유지 시 잠시 후 재시도됨),
+        True = 처리 완료(이번 홀드 소비).
+        """
         if direction == "up":
+            if self._reverse_until:
+                self._reverse_until = 0.0
+                self.log("[FSM] 후진 시퀀스 취소 (업패들 홀드)")
             if self.mode == MANUAL:
                 self.mode = AUTO
                 self._last_shift = time.time()  # 복귀 직후 즉발 변속 방지
                 self.log("[FSM] -> AUTO (시프트업 패들 홀드)")
-        elif direction == "down":
-            t = self.t
-            if not t.alive or t.gear == 0:
-                return
-            if t.speed * 3.6 > self.reverse_max_kmh:
-                self.log(f"[FSM] 후진 거부 — 속도 {t.speed*3.6:.0f}km/h "
-                         f"(한계 {self.reverse_max_kmh:.0f})")
-                return
-            self._reverse_until = time.time() + 2.5
-            self.log("[FSM] 후진 진입 시퀀스 (다운패들 홀드)")
+            return True
+        # direction == "down": 후진 진입
+        t = self.t
+        now = time.time()
+        # 텔레메트리 신선도 요구 — 메뉴 진입 직후의 잔상 데이터로 오발 방지
+        if not t.alive or now - t.last_rx > 0.15 or t.gear == 0:
+            return False
+        if t.speed * 3.6 > self.reverse_max_kmh:
+            return False  # 감속 중 홀드 유지 -> 정지하면 재시도로 자동 발동
+        # 데드라인은 시작 기어에 비례 (고단에서 2.5s 고정이 모자랐음)
+        self._reverse_until = now + 1.0 + 0.5 * t.gear
+        self.log(f"[FSM] 후진 진입 시퀀스 ({t.gear}단부터, 다운패들 홀드)")
+        return True
 
     def _resolve_pending(self, now, gear):
         """직전 변속 명령의 반영 여부 확인. 반환: True=변속 판단 진행 가능."""

@@ -157,10 +157,11 @@ def main():
                 "brake": state.brake, "mode": fsm.mode,
                 "start_ratio": lcfg.get("start_ratio", 0.5),
                 "blink_ratio": lcfg.get("blink_ratio", 0.95),
+                "blink_hz": lcfg.get("blink_hz", 5),
                 "events": list(EVENTS),
             }
         port = wcfg.get("port", 8777)
-        WebUI(provider, port).start()
+        WebUI(provider, port, host=wcfg.get("host", "127.0.0.1"), log=log).start()
         log(f"웹 대시보드: http://127.0.0.1:{port}")
 
     print("실행 중... Ctrl+C로 종료")

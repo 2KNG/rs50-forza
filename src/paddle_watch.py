@@ -99,14 +99,22 @@ class PaddleWatcher(threading.Thread):
             else:
                 time.sleep(0.001)
             # 홀드 판정 (리포트 유무와 무관하게 마지막 상태 기준)
+            held = {"up": prev_up, "down": prev_down}
             for name in ("up", "down"):
                 if (since[name] is not None and not fired[name]
                         and now - since[name] >= self.hold_s):
-                    fired[name] = True
+                    if held["up" if name == "down" else "down"]:
+                        continue  # 양쪽 동시 홀드 = 모호한 의도 -> 발화 보류
+                    ok = True
                     try:
                         if self.on_hold:
-                            self.on_hold(name)
+                            ok = self.on_hold(name)
                     except Exception as e:
                         self.log(f"[paddle] 홀드 콜백 오류: {e}")
+                    if ok is False:
+                        # 조건 미충족(예: 아직 속도 초과) -> 홀드 유지 시 0.3s 후 재시도
+                        since[name] = now - self.hold_s + 0.3
+                    else:
+                        fired[name] = True
         if self._h:
             self._h.close()
