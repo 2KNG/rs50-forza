@@ -1,0 +1,38 @@
+# RS50 x Forza Horizon 6 설정
+
+[telemetry]
+port = 5607            # 게임 Data Out 포트와 일치 (5200-5300 회피 권장)
+
+[shift_keys]           # 게임 키보드 바인딩과 일치시킬 것
+up = "e"
+down = "q"
+press_ms = 30
+
+[paddles]              # 2026-07-11 실측 (tools/paddle_capture.py)
+byte_up = 1            # 오른쪽 패들 = byte 1 bit 0
+bit_up = 0
+byte_down = 1          # 왼쪽 패들 = byte 1 bit 1
+bit_down = 1
+
+[override]
+timeout_s = 7.0        # 매뉴얼 오버라이드 -> 오토 복귀 시간
+hold_to_auto_s = 2.0   # 시프트업 패들 홀드 -> 즉시 오토 복귀
+
+[auto]
+upshift_ratio = 0.88   # (rpm-idle)/(max-idle) 이 값 초과 시 업시프트
+downshift_ratio = 0.35 # 이 값 미만이면 다운시프트 (코스팅 포함, 11km/h 이상)
+min_shift_interval_s = 0.6
+max_gear = 8
+
+[led]                  # 기능 B — python -m src.main --led
+preset = "f1"          # "f1"(초3/빨4/파3, 보라 점멸) | "classic" | "porsche"
+mode = "ltr"           # "ltr"(좌->우 10단계) | "center"(양끝->중앙 5단계)
+start_ratio = 0.5      # 이 rpm 비율부터 점등 시작
+blink_ratio = 0.95     # 이 비율부터 전체 점멸 (시프트 신호)
+blink_hz = 5           # 점멸 속도 (높일수록 HID++ 부하 증가)
+update_hz = 10         # 최대 전송 빈도 (변화시에만 전송됨)
+fast_updates = true    # 3콜 갱신(fn2+commit+refresh). false = 6콜 풀 시퀀스
+
+[web]                  # 웹 대시보드
+enabled = true
+port = 8777
