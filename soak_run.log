@@ -1,0 +1,13 @@
+텔레메트리 수신 대기: UDP 5607
+패들 관찰 시작 (패들=수동 / 업패들 홀드·타임아웃=자동복귀)
+LED rev-light 활성 (슬롯 0 직접, 변화시에만 전송, G HUB 공존)
+웹 대시보드: http://127.0.0.1:8777
+실행 중... Ctrl+C로 종료
+[HB] telem=- ratio=0.00 gear=0 mode=AUTO
+[shifter] 게임 창 비활성 — 'e' 인젝션 보류 (가드: 'forza')
+[telemetry] 알 수 없는 패킷 크기 10B — 무시 (포맷 테이블 추가 필요)
+[telemetry] 알 수 없는 패킷 크기 100B — 무시 (포맷 테이블 추가 필요)
+[telemetry] 알 수 없는 패킷 크기 500B — 무시 (포맷 테이블 추가 필요)
+[shifter] 게임 창 비활성 — 'e' 인젝션 보류 (가드: 'forza')
+[HB] telem=- ratio=0.01 gear=1 mode=AUTO
+[shifter] 게임 창 비활성 — 'e' 인젝션 보류 (가드: 'forza')

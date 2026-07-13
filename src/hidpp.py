@@ -32,6 +32,7 @@ class Rs50Hidpp:
         self.h_long = self._open(0x702)
         self.h_vlong = self._open(0x704)
         self.h_vlong.set_nonblocking(True)
+        self.h_long.set_nonblocking(True)  # 서브디바이스 응답(0x11)은 0x702로 옴
         self._feat_cache = {}
         self._lock = threading.Lock()  # 다중 스레드(LED/종료 경로) 트랜잭션 직렬화
 
@@ -48,10 +49,15 @@ class Rs50Hidpp:
         for h in (self.h_short, self.h_long, self.h_vlong):
             h.close()
 
-    def call(self, feat_idx, func, params=b"", timeout=1.0, retries=3):
-        """HID++ 2.0 호출. 파라미터 길이에 따라 short/long/very-long 자동 선택."""
+    def call(self, feat_idx, func, params=b"", timeout=1.0, retries=3,
+             dev_idx=DEV_IDX):
+        """HID++ 2.0 호출. 파라미터 길이에 따라 short/long/very-long 자동 선택.
+
+        dev_idx: 0xFF=휠 베이스(기본). 서브디바이스(0x01 림, 0x02 페달,
+        0x05 모터/캘리브레이션)는 응답이 0x11 LONG으로 옴 — 매처가 처리.
+        """
         func_sw = ((func & 0x0F) << 4) | SW_ID
-        head = bytes([DEV_IDX, feat_idx, func_sw])
+        head = bytes([dev_idx, feat_idx, func_sw])
         if len(params) <= 3:
             req, h_tx = bytes([0x10]) + head + params, self.h_short
             req += b"\x00" * (7 - len(req))
@@ -70,31 +76,37 @@ class Rs50Hidpp:
 
         with self._lock:
             return self._transact(h_tx, req, feat_idx, func_sw, match_fs,
-                                  timeout, retries, func)
+                                  timeout, retries, func, dev_idx)
 
     def _transact(self, h_tx, req, feat_idx, func_sw, match_fs, timeout,
-                  retries, func):
+                  retries, func, dev_idx=DEV_IDX):
         # 이전 타임아웃의 지각 응답이 다음 호출에 오매칭되지 않도록 드레인
-        for _ in range(32):
-            if not self.h_vlong.read(64):
-                break
+        rx = (self.h_vlong, self.h_long)  # 0x12(베이스) + 0x11(서브디바이스)
+        for h in rx:
+            for _ in range(32):
+                if not h.read(64):
+                    break
 
         last_err = "timeout"
         for _ in range(retries):
             h_tx.write(req)
             t0 = time.time()
             while time.time() - t0 < timeout:
-                resp = bytes(self.h_vlong.read(64))
-                if not resp:
+                got = False
+                for h in rx:
+                    resp = bytes(h.read(64))
+                    if not resp:
+                        continue
+                    got = True
+                    if resp[1] != dev_idx:
+                        continue
+                    if resp[2] == 0xFF and resp[3] == feat_idx and match_fs(resp[4]):
+                        last_err = resp[5]
+                        raise HidppError(resp[5])
+                    if resp[2] == feat_idx and match_fs(resp[3]):
+                        return resp[4:]
+                if not got:
                     time.sleep(0.002)
-                    continue
-                if resp[1] != DEV_IDX:
-                    continue
-                if resp[2] == 0xFF and resp[3] == feat_idx and match_fs(resp[4]):
-                    last_err = resp[5]
-                    raise HidppError(resp[5])
-                if resp[2] == feat_idx and match_fs(resp[3]):
-                    return resp[4:]
         raise TimeoutError(f"HID++ 응답 없음 (feat_idx={feat_idx}, func={func}, {last_err})")
 
     def feature_index(self, feat_id):
