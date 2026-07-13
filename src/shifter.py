@@ -21,12 +21,15 @@ def _foreground_title():
 
 
 class Shifter:
-    def __init__(self, key_up="e", key_down="q", press_ms=30, focus_guard="forza"):
+    def __init__(self, key_up="e", key_down="q", press_ms=30, focus_guard="forza",
+                 log=print):
         self.key_up = key_up
         self.key_down = key_down
         self.press_s = press_ms / 1000.0
         self.focus_guard = (focus_guard or "").lower()
+        self.log = log
         self._lock = threading.Lock()
+        self._last_skip_log = 0.0
 
     def _focused(self):
         if not self.focus_guard:
@@ -38,6 +41,11 @@ class Shifter:
 
     def _press(self, key):
         if not self._focused():
+            now = time.time()
+            if now - self._last_skip_log > 10:
+                self._last_skip_log = now
+                self.log(f"[shifter] 게임 창 비활성 — '{key}' 인젝션 보류 "
+                         f"(가드: '{self.focus_guard}')")
             return False
         with self._lock:
             pydirectinput.keyDown(key)

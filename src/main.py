@@ -100,7 +100,8 @@ def main():
 
     shifter = Shifter(cfg["shift_keys"]["up"], cfg["shift_keys"]["down"],
                       cfg["shift_keys"].get("press_ms", 30),
-                      focus_guard=cfg["shift_keys"].get("focus_guard", "forza"))
+                      focus_guard=cfg["shift_keys"].get("focus_guard", "forza"),
+                      log=log)
     fsm_cfg = {**cfg.get("auto", {}), **cfg.get("override", {})}
     fsm = AutoShiftFSM(state, shifter, fsm_cfg, log=log)
 
