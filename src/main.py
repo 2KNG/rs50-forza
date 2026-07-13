@@ -31,6 +31,14 @@ def load_config():
 EVENTS = collections.deque(maxlen=80)
 
 
+def _seg_colors(lcfg):
+    """웹 스트립이 물리 휠과 같은 프리셋 색을 쓰도록 /state로 전달."""
+    from src.ledctl import PRESETS
+    p = PRESETS.get(lcfg.get("preset", "f1"), PRESETS["f1"])
+    to_css = lambda c: f"rgb({c[0]},{c[1]},{c[2]})"
+    return {"ltr": [to_css(c) for c in p["ltr"]], "blink": to_css(p["blink"])}
+
+
 def log(msg):
     print(msg)
     EVENTS.append((time.strftime("%H:%M:%S"), str(msg)))
@@ -159,6 +167,7 @@ def main():
                 "start_ratio": lcfg.get("start_ratio", 0.5),
                 "blink_ratio": lcfg.get("blink_ratio", 0.95),
                 "blink_hz": lcfg.get("blink_hz", 5),
+                "seg_colors": _seg_colors(lcfg),
                 "events": list(EVENTS),
             }
         port = wcfg.get("port", 8777)

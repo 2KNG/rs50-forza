@@ -194,8 +194,11 @@ body[data-theme=neon] .panel{box-shadow:0 0 calc(var(--u)*2.2) rgba(59,26,110,.3
 <section class="panel events"><h3>EVENTS</h3><div class="log" id="log"></div></section>
 </main>
 <script>
-const N=10, SEG=['var(--grn)','var(--grn)','var(--grn)','var(--red)','var(--red)',
-                 'var(--red)','var(--red)','var(--blu)','var(--blu)','var(--blu)'];
+const N=10;
+/* 프리셋 색은 /state의 seg_colors로 동기화 (물리 휠과 항상 일치); 폴백 = f1 */
+let SEG=['var(--grn)','var(--grn)','var(--grn)','var(--red)','var(--red)',
+         'var(--red)','var(--red)','var(--blu)','var(--blu)','var(--blu)'];
+let BLINK_COLOR='var(--pur)';
 const THEMES=[['pit','PIT'],['f1','F1'],['retro','RETRO'],['minimal','OLED'],['neon','NEON']];
 const DISPLAYS=[['digital','DIGITAL'],['analog','ANALOG']];
 const $=id=>document.getElementById(id);
@@ -258,6 +261,7 @@ async function poll(){
     T=await (await fetch('/state')).json();
     fails=0;
     if(!zoneDrawn&&T.blink_ratio){drawRedzone(T.blink_ratio);zoneDrawn=true;}
+    if(T.seg_colors){SEG=T.seg_colors.ltr;BLINK_COLOR=T.seg_colors.blink;}
     const gtxt=T.gear===0?'R':(T.gear>10?'N':(T.gear||'-'));
     if(gtxt!==lastGear){
       for(const el of [$('gear'),$('gearA')]){
@@ -315,7 +319,7 @@ function render(ts){
     const lit=D.ratio<=T.start_ratio?0:
       Math.min(N,Math.max(1,Math.round((D.ratio-T.start_ratio)/(T.blink_ratio-T.start_ratio)*N)));
     leds.forEach((el,i)=>{
-      if(blinkOn){el.style.background='var(--pur)';el.style.boxShadow=`0 0 ${(u*1.5).toFixed(0)}px var(--pur)`;}
+      if(blinkOn){el.style.background=BLINK_COLOR;el.style.boxShadow=`0 0 ${(u*1.5).toFixed(0)}px ${BLINK_COLOR}`;}
       else if(overRev){el.style.background='var(--seg-off)';el.style.boxShadow='none';}
       else if(i<lit){el.style.background=SEG[i];el.style.boxShadow=`0 0 ${u.toFixed(0)}px ${SEG[i]}`;}
       else{el.style.background='var(--seg-off)';el.style.boxShadow='none';}
