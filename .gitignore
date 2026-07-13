@@ -4,3 +4,5 @@ refs/
 run.log
 run.err.log
 run.pid
+soak_run.log
+center_calibration.json

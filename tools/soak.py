@@ -14,9 +14,12 @@ import sys
 import time
 from pathlib import Path
 
+import tomllib
+
 ROOT = Path(__file__).resolve().parent.parent
 LOG = ROOT / "soak_run.log"
-PORT = 5607
+with open(ROOT / "config.toml", "rb") as _f:
+    PORT = tomllib.load(_f)["telemetry"]["port"]
 GARBAGE_SIZES = (10, 100, 500)
 
 
@@ -122,8 +125,11 @@ def main():
     print(f"HB {hbs}회 / 미지 패킷 경고 {unknown} (크기 종류 {len(GARBAGE_SIZES)}개 = 정상) "
           f"/ AUTO 로그 {shifts} / 인젝션 보류 로그 {skips}")
     print(f"메모리 {mems[0]:.0f} -> {mems[-1]:.0f}MB (증가 {growth:+.0f}MB)")
+    telem_ok = len(re.findall(r"telem=OK", text))
     ok = alive and tracebacks == 0 and unknown <= len(GARBAGE_SIZES) \
-        and (math_isnan(growth) or growth < 50)
+        and telem_ok > 0 and (math_isnan(growth) or growth < 50)
+    if telem_ok == 0:
+        print("!! telem=OK 0회 — 텔레메트리가 앱에 도달하지 않음 (포트 확인)")
     print("판정:", "PASS" if ok else "FAIL")
     sys.exit(0 if ok else 1)
 

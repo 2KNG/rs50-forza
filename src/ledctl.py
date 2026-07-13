@@ -12,8 +12,8 @@
     5. 807A fn6 COMMIT                 [long,  00 01 00 0A 00 0A]
     6. 807A fn7 REFRESH                [short]
 
-  byte5 = 슬롯 애니메이션 방향(1-4만 유효, 0/5는 err 2) — 정지 표시가 되는 값은
-  실기 관찰로 결정 (config [led].direction).
+  byte5 = 슬롯 애니메이션 방향(1-4만 유효, 0/5는 err 2) — main.py가 시작 시
+  슬롯 0을 읽어 그 값을 승계함 (수동 지정은 Rs50Led(direction=) 인자).
 
 [주의] LED 트래픽은 FFB 설정과 HID++ 인터페이스를 공유 — 폭주 시 FFB 기아.
   -> LED 상태(점등 개수/블링크 위상)가 바뀔 때만 전송 + 최소 간격 제한.
@@ -52,8 +52,10 @@ PRESETS = {
 
 
 class Rs50Led:
-    def __init__(self, dev: Rs50Hidpp = None, slot=4, min_interval=0.08,
-                 preset="classic", direction=4, keepalive=0.15, fast=True):
+    def __init__(self, dev: Rs50Hidpp = None, slot=0, min_interval=0.1,
+                 preset="f1", direction=4, keepalive=None, fast=True):
+        # keepalive=None이 기본: 슬롯 0 "내용" 갱신 방식은 재전송이 불필요하고
+        # 상시 전송은 FFB를 굶김. (킵얼라이브는 구 슬롯4/activate 방식의 유물)
         self.fast = fast
         self.dev = dev or Rs50Hidpp()
         self.idx_a = self.dev.feature_index(FEAT_EFFECT)

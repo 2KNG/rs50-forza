@@ -60,25 +60,29 @@ def main():
         print("저장된 센터값 없음 — --set으로 최초 저장 필요")
 
     if "--set" in sys.argv:
+        input("휠을 정확히 정중앙으로 잡은 상태에서 Enter (Ctrl+C 취소) ")
+        # Enter 이후 값을 새로 읽어 저장 (프롬프트 대기 중 움직임 반영)
+        still, _, cur = stillness_check(dev, idx)
         if not still:
-            print("!! 휠이 움직이는 중 — 정중앙으로 잡고 다시 실행")
+            print("!! 휠이 움직이는 중 — 정중앙으로 고정하고 다시 실행")
             sys.exit(1)
-        input(f"휠이 정확히 정중앙입니까? Enter = 센터를 {b}로 저장 (Ctrl+C 취소) ")
-        dev.call(idx, 3, bytes([b >> 8, b & 0xFF, 0]), dev_idx=DEV_MOTOR)
-        STORE.write_text(json.dumps({"center_raw": b, "ts": time.time()}))
-        print(f"센터 저장 완료: {b} (펌웨어 영구 저장)")
+        dev.call(idx, 3, bytes([cur >> 8, cur & 0xFF, 0]), dev_idx=DEV_MOTOR)
+        STORE.write_text(json.dumps({"center_raw": cur, "ts": time.time()}))
+        print(f"센터 저장 완료: {cur} (펌웨어 영구 저장)")
         # 검증: 조이스틱 인터페이스 스티어링 축이 0x8000 근처인지
         import hid
         for d in hid.enumerate(0x046D, 0xC276):
             if d.get("usage_page") == 0x0001 and d.get("usage") == 0x04:
-                h = hid.device(); h.open_path(d["path"]); h.set_nonblocking(True)
-                time.sleep(0.2)
-                data = bytes(h.read(64)) or bytes(h.read(64))
+                h = hid.device(); h.open_path(d["path"])
+                data = bytes(h.read(64, timeout_ms=800))  # 블로킹 읽기
                 h.close()
                 if len(data) >= 6:
                     axis = data[4] | (data[5] << 8)
                     print(f"조이스틱 스티어링 축: {axis:#06x} "
                           f"(0x8000 근처면 정상, 오차 {abs(axis-0x8000)})")
+                else:
+                    print("축 보고 없음 — 휠을 살짝 움직였다 놓고 "
+                          "python tools/recenter.py 로 재확인")
                 break
     dev.close()
 

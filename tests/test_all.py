@@ -316,3 +316,115 @@ class TestWebUI(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class FakeHidHandle:
+    """PaddleWatcher용 스크립트형 HID 핸들 — report 속성으로 상태 주입."""
+    def __init__(self):
+        self.report = bytes(8)
+
+    def read(self, n):
+        time.sleep(0.002)
+        return self.report
+
+    def set_nonblocking(self, v):
+        pass
+
+    def close(self):
+        pass
+
+
+class TestPaddleWatcher(unittest.TestCase):
+    def _make(self, on_paddle, on_hold, hold_s=0.08):
+        from src.paddle_watch import PaddleWatcher
+        fake = FakeHidHandle()
+        orig = PaddleWatcher._open_joystick
+        PaddleWatcher._open_joystick = staticmethod(lambda: fake)
+        try:
+            w = PaddleWatcher(1, 0, 1, 1, on_paddle=on_paddle, on_hold=on_hold,
+                              hold_s=hold_s, log=lambda m: None)
+        finally:
+            PaddleWatcher._open_joystick = orig
+        return w, fake
+
+    @staticmethod
+    def _report(up=False, down=False):
+        b = bytearray(8)
+        b[1] = (1 if up else 0) | (2 if down else 0)
+        return bytes(b)
+
+    def test_edge_and_hold_fire_once(self):
+        edges, holds = [], []
+        w, fake = self._make(edges.append, lambda d: holds.append(d) or True)
+        w.start()
+        fake.report = self._report(up=True)
+        time.sleep(0.05)
+        self.assertEqual(edges, ["up"], "에지 1회")
+        time.sleep(0.15)  # hold_s(0.08) 경과
+        self.assertEqual(holds, ["up"], "홀드 1회만")
+        time.sleep(0.15)
+        self.assertEqual(holds, ["up"], "재발화 없음(True 반환 시)")
+        w.stop()
+
+    def test_hold_rearm_on_false(self):
+        holds = []
+        w, fake = self._make(lambda d: None,
+                             lambda d: (holds.append(time.time()), False)[1])
+        w.start()
+        fake.report = self._report(down=True)
+        time.sleep(0.7)  # 0.08 첫 발화 + 0.3 재시도 x2 여유
+        w.stop()
+        self.assertGreaterEqual(len(holds), 2, "False 반환 시 재시도")
+        self.assertGreater(holds[1] - holds[0], 0.25, "재시도 간격 ~0.3s")
+
+    def test_both_held_deferred(self):
+        holds = []
+        w, fake = self._make(lambda d: None, lambda d: holds.append(d) or True)
+        w.start()
+        fake.report = self._report(up=True, down=True)
+        time.sleep(0.25)
+        self.assertEqual(holds, [], "양쪽 동시 홀드 = 발화 보류")
+        fake.report = self._report(up=True)  # 한쪽 해제 -> 남은 쪽 발화 허용
+        time.sleep(0.1)
+        w.stop()
+        self.assertEqual(holds, ["up"])
+
+
+class TestShifter(unittest.TestCase):
+    def _make(self, title="Forza Horizon 6", guard="forza"):
+        import src.shifter as sh
+        pressed = []
+        orig_down, orig_up = sh.pydirectinput.keyDown, sh.pydirectinput.keyUp
+        orig_title = sh._foreground_title
+        sh.pydirectinput.keyDown = lambda k: pressed.append(("down", k))
+        sh.pydirectinput.keyUp = lambda k: pressed.append(("up", k))
+        sh._foreground_title = lambda: title
+        s = sh.Shifter("e", "q", press_ms=1, focus_guard=guard, log=lambda m: None)
+        restore = lambda: (setattr(sh.pydirectinput, "keyDown", orig_down),
+                           setattr(sh.pydirectinput, "keyUp", orig_up),
+                           setattr(sh, "_foreground_title", orig_title))
+        return s, pressed, restore
+
+    def test_focus_guard_blocks(self):
+        s, pressed, restore = self._make(title="Notepad")
+        try:
+            self.assertFalse(s.up())
+            self.assertEqual(pressed, [], "비게임 창엔 인젝션 금지")
+        finally:
+            restore()
+
+    def test_focus_match_presses_and_releases(self):
+        s, pressed, restore = self._make(title="Forza Horizon 6")
+        try:
+            self.assertTrue(s.up())
+            self.assertEqual(pressed, [("down", "e"), ("up", "e")])
+        finally:
+            restore()
+
+    def test_empty_guard_always_presses(self):
+        s, pressed, restore = self._make(title="Whatever", guard="")
+        try:
+            self.assertTrue(s.down())
+            self.assertEqual(pressed[0], ("down", "q"))
+        finally:
+            restore()

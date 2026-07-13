@@ -1,5 +1,12 @@
 # RS50 × Forza Horizon 6
 
+> **EN TL;DR** — Companion app for the Logitech G RS50 wheel + Forza Horizon 6 (PC):
+> Hyundai/Genesis-style auto↔manual paddle handover (telemetry-driven autoshift via
+> key injection, paddles hand over to manual, auto-resume by timeout/hold), direct
+> RGB rev-strip control over reverse-engineered HID++ (coexists with G HUB), and a
+> zero-dependency web dashboard (5 themes, analog/digital). Windows 10/11,
+> Python 3.11+, `pip install -r requirements.txt`, run `start.bat`. Docs are Korean.
+
 Logitech G RS50 휠 + FH6 연동 유틸:
 
 - **기능 A — 패들 오토↔매뉴얼 핸드오버**: 평소 텔레메트리 기반 자동 변속(키 인젝션),
@@ -36,7 +43,7 @@ python tools\verify.py       # 하드웨어 자가진단 (게임 불필요, --vi
 | 항목 | 확정 사실 |
 |---|---|
 | USB | `046d:c276` "RS50 Base for PlayStation/PC" |
-| HID++ 라우팅 | 요청 short `0x10` → usage `0xFF43/0x701`, 응답은 **항상** very-long `0x12` ← usage `0x704` |
+| HID++ 라우팅 | 요청 short `0x10` → usage `0xFF43/0x701`. 응답: 베이스(dev 0xFF)=`0x12`←usage `0x704`, **서브디바이스(0x01/0x02/0x05)=`0x11`←usage `0x702`** |
 | **SW_ID** | **`0x03` 고정. `0x0A~0x0E`는 G HUB 세션과 충돌 → FFB가 꼬여 휠이 제멋대로 회전** |
 | LED 표시 | **표시는 슬롯 0만 렌더링** (슬롯 활성화 명령으로 표시 전환 불가). LED 사이 색은 펌웨어가 그라데이션 보간 |
 | LED 갱신 | fn2 쓰기만으론 저장만 됨. 표시 반영 = fn2 + fn6-commit(`00 01 00 0A 00 0A`) + fn7 (3콜) |
@@ -56,11 +63,27 @@ src/shifter.py      pydirectinput 키 인젝션
 src/ledctl.py       rev-light 렌더러 (슬롯 0, 3콜 갱신, 프리셋/물결/점멸)
 src/webui.py        웹 대시보드 (stdlib, 의존성 없음)
 src/main.py         조립 + 이벤트 로그
+tests/test_all.py   단위 테스트 18케이스 (python -m unittest tests.test_all)
 tools/verify.py     하드웨어 검증 스위트 (10항목)
+tools/ffb_doctor.py FFB 설정 진단/복구/가이드 (FFB_DEBUG.md 참고)
+tools/recenter.py   센터 캘리브레이션 (우측 쏠림 해결, --set)
+tools/settings_watch.py  설정 변경 실시간 감시 (SW_ID=0 브로드캐스트)
+tools/soak.py       장시간 안정성 소크 테스트
 tools/*.py          실측/진단 도구 (paddle_capture, hidpp_probe, led_* 등)
 refs/               분석용 레퍼런스 클론 (git 미추적)
 slot0_backup.json   슬롯 0 공장 패턴 백업 (초/노/빨 대칭)
 ```
+
+## 크레딧 & 면책
+
+- HID++/LED/캘리브레이션 프로토콜의 근간은 [mescon/logitech-trueforce-linux-driver](https://github.com/mescon/logitech-trueforce-linux-driver)의
+  프로토콜 스펙 문서이며, 본 레포의 실기 검증으로 교차 확인/보완했습니다. 참고:
+  [Juice-XIJ/forza_auto_gear](https://github.com/Juice-XIJ/forza_auto_gear),
+  [GinoLin980/Forza-Horizon-realistic-gearbox](https://github.com/GinoLin980/Forza-Horizon-realistic-gearbox),
+  [Mhytee/Trueforce-For-All](https://github.com/Mhytee/Trueforce-For-All)
+- **역공학 기반 비공식 도구입니다.** Logitech/Playground Games와 무관하며, 사용에 따른
+  책임은 사용자에게 있습니다 (MIT LICENSE). 휠 펌웨어에 설정을 쓰는 도구가 포함되어
+  있으니 각 도구의 설명을 읽고 사용하세요.
 
 ## 주의/트러블슈팅
 

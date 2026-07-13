@@ -33,7 +33,7 @@ SETTINGS = {
              lambda p: None),
     0x8133: ("댐핑", lambda p: f"{be16(p)/655.35:.0f}%",
              lambda pct: bytes([int(pct*655.35) >> 8, int(pct*655.35) & 0xFF, 0]),
-             "10~30% 권장",
+             "0% (2026-07-13 실측 정상값, FFB_DEBUG 기준)",
              lambda p: be16(p)/655.35 > 70 and "댐핑 과다 — 무겁고 둔한 느낌의 원인 후보"),
     0x8138: ("회전 범위", lambda p: f"{be16(p)}°",
              lambda deg: bytes([int(deg) >> 8, int(deg) & 0xFF, 0]),
@@ -91,10 +91,10 @@ def fix(dev):
         dev.call(idx, SET_FN[feat], enc(target))
         time.sleep(0.15)
         after = dev.call(idx, 1)
-        if after == before and feat == 0x8139:
-            # 실측(2026-07-13): TrueForce SET은 펌웨어가 조용히 거부하는 상태가 있음
-            print("    !! 펌웨어가 쓰기를 무시함 — G HUB > RS50 > TRUEFORCE "
-                  "슬라이더로 직접 설정하세요 (확실한 경로)")
+        if after == before:
+            # 실측(2026-07-13): 일부 설정은 펌웨어가 쓰기를 조용히 무시함
+            print(f"    !! 펌웨어가 쓰기를 무시함 — G HUB의 {name} 슬라이더로 "
+                  "직접 설정하세요")
         else:
             print(f"    적용됨 -> {dec(after)}")
 

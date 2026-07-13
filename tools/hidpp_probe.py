@@ -15,7 +15,7 @@ import hid
 
 VID, PID = 0x046D, 0xC276
 DEV_IDX = 0xFF
-SW_ID = 0x0A
+SW_ID = 0x03  # 0x0A-0x0E는 G HUB 세션과 충돌 (FFB 오염) — src.hidpp와 동일 값
 
 KNOWN = {
     0x0000: "IRoot", 0x0001: "IFeatureSet", 0x0002: "IFeatureInfo",
