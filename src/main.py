@@ -143,6 +143,14 @@ def main():
                           preset=lcfg.get("preset", "f1"),
                           keepalive=None,
                           fast=lcfg.get("fast_updates", True))
+            # 휠은 전원 재인입마다 온보드 프로필로 부팅(실측) -> 매 시작 데스크톱 보장
+            try:
+                idx_p = led.dev.feature_index(0x8137)
+                if led.dev.call(idx_p, 1)[0] != 0:
+                    led.dev.call(idx_p, 2, bytes([0, 0, 0]))
+                    log("[FFB] 온보드 부팅 감지 -> 데스크톱 프로필로 전환")
+            except Exception:
+                pass
             try:
                 _, b5, _ = led.read_slot(0)
                 led.direction = b5  # 슬롯 0 고유 byte5 유지
