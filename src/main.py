@@ -102,16 +102,12 @@ def main():
         # 주행 중 LED 렌더링은 최종 폐기 (RS50: FFB와 LED가 USB 컨트롤 파이프
         # 공유 — 어떤 전송이든 FFB 붕괴, 실주행 확정. rev 게이지 = 웹 담당).
         # --led는 시작 시 1회만: 데스크톱 프로필 보장 + 정적 F1 그라데이션 표시.
+        # 설정 불간섭 원칙: 프로필/강도 등 FFB 설정은 일절 건드리지 않는다
+        # (설정의 단일 주인 = G HUB UI. HID++로 써봤자 G HUB DB가 재적용하며
+        #  되돌림 — 밀당의 원인이었음). --led는 슬롯0 색 1회 재도색만.
         try:
             from src.ledctl import Rs50Led
             led = Rs50Led(slot=0, preset=lcfg.get("preset", "f1"))
-            try:
-                idx_p = led.dev.feature_index(0x8137)
-                if led.dev.call(idx_p, 1)[0] != 0:
-                    led.dev.call(idx_p, 2, bytes([0, 0, 0]))
-                    log("[FFB] 온보드 부팅 감지 -> 데스크톱 프로필로 전환")
-            except Exception:
-                pass
             try:
                 _, b5, _ = led.read_slot(0)
                 led.direction = b5
@@ -119,7 +115,7 @@ def main():
                 pass
             led.write_frame(led.frame_for_ratio(1.0, mode="ltr"))  # 정적 그라데이션
             led.dev.close()
-            log("[LED] 정적 F1 그라데이션 적용 — 이후 휠 전송 0 (FFB 순정)")
+            log("[LED] 정적 F1 그라데이션 적용 — 이후 휠 전송 0")
         except Exception as e:
             log(f"[LED] 초기화 생략 ({e}) — 기능에 영향 없음")
 
