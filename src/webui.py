@@ -378,7 +378,8 @@ SIDE_TMPL = r"""<!doctype html>
 *{margin:0;box-sizing:border-box;font-family:'Segoe UI',system-ui,sans-serif}
 html,body{height:100%}
 body{background:var(--bg);color:var(--tx);display:flex;flex-direction:column;
-     padding:calc(var(--u)*1.6);gap:calc(var(--u)*1.4);overflow:hidden}
+     padding:calc(var(--u)*1.6);padding-bottom:calc(var(--u)*7);
+     gap:calc(var(--u)*1.4);overflow:hidden}
 #flash{position:fixed;inset:0;pointer-events:none;z-index:1;opacity:0;
   box-shadow:inset 0 0 calc(var(--u)*16) calc(var(--u)*3) var(--pur);
   transition:opacity .06s}
@@ -492,8 +493,8 @@ body[data-theme=neon] #gear,body[data-theme=neon] #gearA{
     <nav class="sw" id="themes"></nav>
   </div>
 </div>
-<main id="main"></main>
 <div class="rev" id="rev"></div>
+<main id="main"></main>
 <script>
 const SIDE='__SIDE__', N=24;
 const $=id=>document.getElementById(id);
