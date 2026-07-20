@@ -21,7 +21,7 @@ hold_to_auto_s = 2.0   # 패들 홀드 판정 시간 (업=오토 복귀, 다운=
 reverse_max_kmh = 15   # 이 속도 이하에서만 다운패들 홀드 -> R 진입 허용
 
 [auto]
-upshift_ratio = 0.88   # (rpm-idle)/(max-idle) 이 값 초과 시 업시프트
+upshift_ratio = 0.90   # (rpm-idle)/(max-idle) 이 값 초과 시 업시프트
 downshift_ratio = 0.35 # 이 값 미만이면 다운시프트 (코스팅 포함, 11km/h 이상)
 min_shift_interval_s = 0.6
 max_gear = 8

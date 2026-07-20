@@ -367,6 +367,206 @@ setInterval(()=>{if(performance.now()-lastRender>200)render(performance.now());}
 </script></body></html>"""
 
 
+SIDE_TMPL = r"""<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RS50 __SIDE__</title>
+<style>
+:root{--u:min(1vw,1.78vh);
+  --grn:#2bd45f;--red:#ff3b3b;--blu:#3b6cff;--pur:#b93bff;--amb:#ffb020;
+  --seg-off:#1a2029}
+*{margin:0;box-sizing:border-box;font-family:'Segoe UI',system-ui,sans-serif}
+html,body{height:100%}
+body{background:var(--bg);color:var(--tx);display:flex;flex-direction:column;
+     padding:calc(var(--u)*2);gap:calc(var(--u)*1.6);overflow:hidden}
+#flash{position:fixed;inset:0;pointer-events:none;z-index:1;opacity:0;
+  box-shadow:inset 0 0 calc(var(--u)*16) calc(var(--u)*3) var(--pur);
+  transition:opacity .06s}
+.top{display:flex;align-items:center;gap:calc(var(--u)*1.2)}
+.brand{font-weight:800;letter-spacing:3px;font-size:calc(var(--u)*1.4);color:var(--dim)}
+.dot{width:calc(var(--u)*1);height:calc(var(--u)*1);border-radius:50%;background:#444;
+     margin-left:auto}
+.dot.on{background:var(--grn);box-shadow:0 0 calc(var(--u)*1) var(--grn)}
+.badge{font-size:calc(var(--u)*1.5);font-weight:800;letter-spacing:2px;
+  padding:calc(var(--u)*.6) calc(var(--u)*1.5);border-radius:calc(var(--u)*.8)}
+.badge.auto{background:#0d2d18;color:var(--grn)}
+.badge.manual{background:#332309;color:var(--amb);animation:pulse 1.6s infinite}
+.badge.off{background:#22262e;color:var(--dim)}
+.badge.lost{background:#33090c;color:var(--red)}
+@keyframes pulse{50%{box-shadow:0 0 calc(var(--u)*1.4) rgba(255,176,32,.5)}}
+main{flex:1;display:flex;flex-direction:column;justify-content:center;
+     align-items:center;gap:calc(var(--u)*2);min-height:0}
+.big{text-align:center}
+.big small{display:block;font-size:calc(var(--u)*1.6);color:var(--dim);
+           letter-spacing:4px;margin-bottom:calc(var(--u)*.6)}
+#gear{font-size:calc(var(--u)*30);font-weight:800;line-height:.95;
+      transition:transform .12s}
+#speed{font-size:calc(var(--u)*17);font-weight:800;line-height:1;
+       font-variant-numeric:tabular-nums}
+#drift{font-size:calc(var(--u)*24);font-weight:800;line-height:1;color:var(--acc);
+       font-variant-numeric:tabular-nums}
+#darrow{font-size:calc(var(--u)*10);vertical-align:middle}
+.sub{font-size:calc(var(--u)*2.6);color:var(--dim);font-variant-numeric:tabular-nums}
+.sub b{color:var(--tx)}
+.pop{transform:scale(1.12)!important}
+/* 횡G 대형 미터 */
+.gwrap{width:min(80%,calc(var(--u)*56))}
+.gtrack{position:relative;height:calc(var(--u)*2.4);background:var(--seg-off);
+  border:1px solid var(--line);border-radius:calc(var(--u)*1.2)}
+.gtick{position:absolute;left:50%;top:0;bottom:0;width:2px;background:var(--dim);opacity:.5}
+#gdot{position:absolute;top:50%;left:50%;width:calc(var(--u)*2);height:calc(var(--u)*2);
+  border-radius:50%;background:var(--acc);transform:translate(-50%,-50%);
+  box-shadow:0 0 calc(var(--u)*1.4) var(--acc)}
+.glabel{display:flex;justify-content:space-between;color:var(--dim);
+  font-size:calc(var(--u)*1.3);margin-top:calc(var(--u)*.4)}
+/* 이벤트 (right 전용) */
+.events{width:100%;max-height:calc(var(--u)*22);overflow:hidden;
+  font:calc(var(--u)*1.5)/1.8 Consolas,monospace}
+.events div{color:var(--dim);animation:fadein .4s ease}
+.events div b{color:var(--tx)}
+@keyframes fadein{from{opacity:0;transform:translateY(-4px)}to{opacity:1}}
+/* rev 바: 바깥(모니터 끝) -> 중앙(게임) 방향으로 차오름 */
+.rev{display:flex;gap:calc(var(--u)*.5);height:calc(var(--u)*7);
+     flex-direction:__FLEXDIR__}
+.rev div{flex:1;border-radius:calc(var(--u)*.6);background:var(--seg-off);
+  border:1px solid var(--line);transition:background .05s,box-shadow .05s}
+/* 테마 */
+body[data-theme=pit]{--bg:#0b0e14;--panel:#141922;--line:#232b38;--tx:#e6edf3;
+  --dim:#8b98a9;--acc:#3b6cff}
+body[data-theme=f1]{--bg:#08080a;--line:#26262c;--tx:#fff;--dim:#77777f;--acc:#e10600;
+  background-image:repeating-linear-gradient(45deg,#0a0a0d 0 3px,#08080a 3px 6px)}
+body[data-theme=f1] #gear,body[data-theme=f1] #speed{font-style:italic}
+body[data-theme=retro]{--bg:#0d0a06;--line:#3a2c14;--tx:#ffd9a0;--dim:#9c7b4a;
+  --acc:#ffb020;--seg-off:#221808}
+body[data-theme=minimal]{--bg:#000;--line:#111;--tx:#ddd;--dim:#555;--acc:#888;
+  --seg-off:#111}
+body[data-theme=neon]{--bg:#0d0221;--line:#3b1a6e;--tx:#f3e9ff;--dim:#8f7bb8;
+  --acc:#ff2bd6;--seg-off:#1d1040;
+  background-image:repeating-linear-gradient(transparent 0 39px,rgba(255,43,214,.07) 39px 40px),
+   linear-gradient(#0d0221 60%,#1b0640)}
+body[data-theme=neon] #gear{background:linear-gradient(180deg,#2be2ff,#ff2bd6);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+</style></head>
+<body data-theme="pit">
+<div id="flash"></div>
+<div class="top"><span class="brand">RS50 · __LABEL__</span>
+  <span class="badge off" id="mode">대기</span><span class="dot" id="teldot"></span></div>
+<main id="main"></main>
+<div class="rev" id="rev"></div>
+<script>
+const SIDE='__SIDE__', N=24;
+document.body.dataset.theme=localStorage.getItem('rs50-theme')||'pit';
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+/* 사이드별 레이아웃 구성 */
+if(SIDE==='left'){
+  $('main').innerHTML=`
+    <div class="big"><small>GEAR</small><div id="gear">-</div></div>
+    <div class="big"><small>KM/H</small><div id="speed">0</div></div>
+    <div class="sub"><b id="rpm">0</b> / <span id="maxrpm">0</span> RPM
+      · <b id="ratio">0</b>%</div>
+    <div class="gwrap"><div class="gtrack"><div class="gtick"></div><div id="gdot"></div></div>
+      <div class="glabel"><span>-2G</span><span>LAT <b id="gval">0.0</b>G</span><span>+2G</span></div></div>`;
+}else{
+  $('main').innerHTML=`
+    <div class="big"><small>DRIFT ANGLE</small>
+      <div><span id="darrow"></span><span id="drift">0</span>°</div>
+      <div class="sub">PEAK <b id="dpeak">-</b></div></div>
+    <div class="sub">CLASS <b id="carclass">-</b> · PI <b id="carpi">-</b></div>
+    <div class="events" id="log"></div>`;
+}
+const rev=$('rev');
+for(let i=0;i<N;i++){const d=document.createElement('div');rev.appendChild(d);}
+const segs=[...rev.children];
+
+let T={ratio:0,alive:false,start_ratio:.5,blink_ratio:.9,seg_colors:null,events:[]};
+let D={ratio:0,rpm:0,speed:0,drift:0,latg:0};
+let lastGear=null,lastEvents='',fails=0,inflight=false,peak=0,peakTs=0;
+const CLS=['D','C','B','A','S1','S2','X','X'];
+
+async function poll(){
+  if(inflight)return; inflight=true;
+  try{
+    T=await (await fetch('/state')).json(); fails=0;
+    const b=$('mode');
+    if(!T.alive){b.textContent='대기';b.className='badge off';}
+    else if(T.mode==='AUTO'){b.textContent='AUTO';b.className='badge auto';}
+    else{b.textContent='MANUAL';b.className='badge manual';}
+    $('teldot').className='dot'+(T.alive?' on':'');
+    if(SIDE==='left'){
+      const g=T.gear===0?'R':(T.gear>10?'N':(T.gear||'-'));
+      if(g!==lastGear){const el=$('gear');el.classList.add('pop');
+        setTimeout(()=>el.classList.remove('pop'),140);lastGear=g;}
+      $('gear').textContent=g;
+      $('maxrpm').textContent=Math.round(T.max_rpm);
+    }else{
+      $('carclass').textContent=CLS[T.car_class]||'-';
+      $('carpi').textContent=T.car_pi||'-';
+      const ev=T.events.slice(-9).map(e=>`<div><b>${esc(e[0])}</b> ${esc(e[1])}</div>`)
+        .reverse().join('');
+      if(ev!==lastEvents){$('log').innerHTML=ev;lastEvents=ev;}
+    }
+  }catch(e){
+    if(++fails>=3){T.alive=false;
+      const b=$('mode');b.textContent='연결 끊김';b.className='badge lost';}
+  }finally{inflight=false;}
+}
+setInterval(poll,150); poll();
+
+let lastRender=0,prevTs=null;
+function render(ts){
+  lastRender=performance.now();
+  const dt=prevTs===null?1/60:Math.min(0.1,(ts-prevTs)/1000); prevTs=ts;
+  const k=1-Math.exp(-dt*9);
+  D.ratio+=((T.alive?T.ratio:0)-D.ratio)*k;
+  D.rpm+=((T.alive?T.rpm:0)-D.rpm)*k;
+  D.speed+=((T.alive?T.speed_kmh:0)-D.speed)*k;
+  D.drift+=((T.alive?T.drift_deg:0)-D.drift)*k;
+  D.latg+=((T.alive?T.lat_g:0)-D.latg)*k;
+  if(SIDE==='left'){
+    $('speed').textContent=Math.round(D.speed);
+    $('rpm').textContent=Math.round(D.rpm);
+    $('ratio').textContent=Math.round(D.ratio*100);
+    $('gval').textContent=Math.abs(D.latg).toFixed(1);
+    $('gdot').style.left=(50+Math.max(-1,Math.min(1,D.latg/2))*46)+'%';
+  }else{
+    const ad=Math.abs(D.drift);
+    $('drift').textContent=ad.toFixed(0);
+    $('darrow').textContent=ad<3?'':(D.drift<0?'◀':'▶');
+    const nowMs=performance.now();
+    if(ad>peak||nowMs-peakTs>5000){peak=ad;peakTs=nowMs;}
+    $('dpeak').textContent=peak>=10?peak.toFixed(0)+'°':'-';
+  }
+  /* rev 바 (바깥->중앙) */
+  const over=T.alive&&T.ratio>=T.blink_ratio;
+  const lit=D.ratio<=T.start_ratio?0:
+    Math.min(N,Math.max(1,Math.round((D.ratio-T.start_ratio)/(T.blink_ratio-T.start_ratio)*N)));
+  const SC=T.seg_colors&&T.seg_colors.ltr;
+  segs.forEach((el,i)=>{
+    if(over){const c=(T.seg_colors&&T.seg_colors.blink)||'var(--pur)';
+      el.style.background=c;el.style.boxShadow=`0 0 14px ${c}`;}
+    else if(T.alive&&i<lit){
+      const c=SC?SC[Math.min(9,Math.floor(i*10/N))]:'var(--grn)';
+      el.style.background=c;el.style.boxShadow=`0 0 10px ${c}`;}
+    else{el.style.background='var(--seg-off)';el.style.boxShadow='none';}
+  });
+  $('flash').style.opacity=over?0.8:0;
+}
+function loop(ts){render(ts);requestAnimationFrame(loop);}
+requestAnimationFrame(loop);
+setInterval(()=>{if(performance.now()-lastRender>200)render(performance.now());},250);
+</script></body></html>"""
+
+
+def _side_page(side):
+    label = "LEFT" if side == "left" else "RIGHT"
+    flexdir = "row" if side == "left" else "row-reverse"
+    return (SIDE_TMPL.replace("__SIDE__", side)
+            .replace("__LABEL__", label)
+            .replace("__FLEXDIR__", flexdir))
+
+
 def _finite(x):
     return x if isinstance(x, (int, str, bool, list, type(None))) \
         else (x if math.isfinite(x) else 0.0)
@@ -402,6 +602,9 @@ class WebUI(threading.Thread):
                     ctype = "application/json"
                 elif self.path == "/":
                     body = PAGE.encode()
+                    ctype = "text/html; charset=utf-8"
+                elif self.path in ("/left", "/right"):
+                    body = _side_page(self.path[1:]).encode()
                     ctype = "text/html; charset=utf-8"
                 else:
                     self.send_response(404)

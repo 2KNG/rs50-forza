@@ -21,6 +21,9 @@ _SLED = {
     "vel_x":       (32,  "<f"),  # 로컬 가로 속도 — 드리프트 각 계산용
     "vel_z":       (40,  "<f"),  # 로컬 전방 속도
     "ang_vel_y":   (48,  "<f"),  # 요 레이트
+    "car_ordinal": (212, "<i"),  # 차량 고유 ID (차별 학습/표시용)
+    "car_class":   (216, "<i"),  # 0=D..7=X
+    "car_pi":      (220, "<i"),  # 퍼포먼스 인덱스
 }
 
 # 패킷 크기별 dash 구간 오프셋
@@ -62,6 +65,9 @@ class TelemetryState:
         self.vel_x = 0.0
         self.vel_z = 0.0
         self.ang_vel_y = 0.0
+        self.car_ordinal = 0
+        self.car_class = 0
+        self.car_pi = 0
 
     @property
     def alive(self):

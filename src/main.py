@@ -44,57 +44,6 @@ def log(msg):
     EVENTS.append((time.strftime("%H:%M:%S"), str(msg)))
 
 
-class LedThread(threading.Thread):
-    """LED 갱신 전용 스레드 — HID++ 지연/오류가 변속 루프를 못 막게 격리.
-
-    G HUB 공존 전제(TrueForce 유지). 슬롯 0(유일한 표시 슬롯)에
-    LED 단계가 바뀔 때만 전송 — 순항 중 0콜/s로 FFB 간섭 최소화.
-    물결은 게임 밖(텔레메트리 부재)에서만.
-    """
-
-    def __init__(self, led, state, lcfg):
-        super().__init__(daemon=True, name="led")
-        self.led, self.state, self.lcfg = led, state, lcfg
-        self._stop = threading.Event()
-        self._last_err = 0.0
-
-    def stop(self):
-        self._stop.set()
-
-    def run(self):
-        race_leds = self.lcfg.get("race_leds", False)
-        was_alive = False
-        while not self._stop.is_set():
-            s = self.state
-            try:
-                if s.alive and not race_leds:
-                    if not was_alive:
-                        was_alive = True
-                        # 주행 진입 시 1회만 소등 (물결 잔상 제거) 후 완전 침묵
-                        from src.ledctl import OFF, NUM_LEDS
-                        self.led.write_fast([OFF] * NUM_LEDS)
-                        self.led._path = None
-                    # 주행 중 LED 완전 침묵 — RS50은 FFB와 LED가 USB 컨트롤
-                    # 파이프를 공유해 어떤 전송이든 FFB를 해침 (실주행 확정).
-                    # rev 게이지는 웹 대시보드가 담당.
-                    time.sleep(0.05)
-                    continue
-                was_alive = s.alive
-                self.led.set_rpm(
-                    s.rpm_ratio if s.alive else 0.0,
-                    start_ratio=self.lcfg.get("start_ratio", 0.5),
-                    blink_ratio=self.lcfg.get("blink_ratio", 0.95),
-                    mode=self.lcfg.get("mode", "ltr"),
-                    blink_hz=self.lcfg.get("blink_hz", 5.0),
-                    idle=not s.alive)
-            except Exception as e:
-                now = time.time()
-                if now - self._last_err > 5:
-                    log(f"[LED] 오류(계속 진행): {e}")
-                    self._last_err = now
-            time.sleep(0.02)
-
-
 def validate_config(cfg):
     if "telemetry" not in cfg or "port" not in cfg["telemetry"]:
         sys.exit("[config] [telemetry].port 누락 — config.toml 확인")
@@ -148,17 +97,14 @@ def main():
     else:
         log("[경고] [paddles] 미설정 — tools/paddle_map.py 로 실측 후 기입 (AUTO 전용 동작)")
 
-    led = led_thread = None
     lcfg = cfg.get("led", {})
     if "--led" in sys.argv:
-        # LED 초기화 실패(휠 절전/부재/응답 없음)해도 앱은 변속 기능으로 계속 동작
+        # 주행 중 LED 렌더링은 최종 폐기 (RS50: FFB와 LED가 USB 컨트롤 파이프
+        # 공유 — 어떤 전송이든 FFB 붕괴, 실주행 확정. rev 게이지 = 웹 담당).
+        # --led는 시작 시 1회만: 데스크톱 프로필 보장 + 정적 F1 그라데이션 표시.
         try:
             from src.ledctl import Rs50Led
-            led = Rs50Led(slot=0, min_interval=1.0 / lcfg.get("update_hz", 10),
-                          preset=lcfg.get("preset", "f1"),
-                          keepalive=None,
-                          fast=lcfg.get("fast_updates", True))
-            # 휠은 전원 재인입마다 온보드 프로필로 부팅(실측) -> 매 시작 데스크톱 보장
+            led = Rs50Led(slot=0, preset=lcfg.get("preset", "f1"))
             try:
                 idx_p = led.dev.feature_index(0x8137)
                 if led.dev.call(idx_p, 1)[0] != 0:
@@ -168,16 +114,14 @@ def main():
                 pass
             try:
                 _, b5, _ = led.read_slot(0)
-                led.direction = b5  # 슬롯 0 고유 byte5 유지
+                led.direction = b5
             except Exception:
                 pass
-            led.write_frame(led.frame_for_ratio(0))  # 풀 시퀀스 1회: 표시 상태 정렬
-            led_thread = LedThread(led, state, lcfg)
-            led_thread.start()
-            log("LED rev-light 활성 (슬롯 0 직접, 변화시에만 전송, G HUB 공존)")
+            led.write_frame(led.frame_for_ratio(1.0, mode="ltr"))  # 정적 그라데이션
+            led.dev.close()
+            log("[LED] 정적 F1 그라데이션 적용 — 이후 휠 전송 0 (FFB 순정)")
         except Exception as e:
-            led = led_thread = None
-            log(f"[LED] 초기화 실패 ({e}) — LED 없이 계속 진행")
+            log(f"[LED] 초기화 생략 ({e}) — 기능에 영향 없음")
 
     wcfg = cfg.get("web", {})
     if wcfg.get("enabled", True):
@@ -193,6 +137,8 @@ def main():
                 "seg_colors": _seg_colors(lcfg),
                 "lat_g": state.lat_g,
                 "drift_deg": state.drift_deg,
+                "car_pi": state.car_pi,
+                "car_class": state.car_class,
                 "events": list(EVENTS),
             }
         port = wcfg.get("port", 8777)
@@ -224,16 +170,6 @@ def main():
         if watcher is not None:
             watcher.stop()
             watcher.join(timeout=1.0)
-        if led_thread is not None:
-            led_thread.stop()
-            led_thread.join(timeout=2.0)
-        if led is not None:
-            try:
-                # 종료 시 풀 F1 그라데이션을 정적으로 남김 (주차 상태 표시)
-                led.write_frame(led.frame_for_ratio(1.0, mode="ltr"))
-            except Exception:
-                pass
-            led.dev.close()
         listener.join(timeout=1.0)
 
 
