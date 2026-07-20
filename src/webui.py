@@ -453,6 +453,28 @@ main{flex:1;display:flex;flex-direction:column;justify-content:center;
 /* 표시 모드 전환 */
 body[data-display=digital] .ana{display:none!important}
 body[data-display=analog] .dig{display:none!important}
+/* ===== 위젯 ===== */
+.wrow{display:flex;gap:calc(var(--u)*1.4);align-items:stretch;justify-content:center;
+  flex-wrap:wrap;width:100%}
+canvas.widget{background:var(--panel);border:1px solid var(--line);
+  border-radius:calc(var(--u)*1.2)}
+#gg{width:calc(var(--u)*24);height:calc(var(--u)*24)}
+#att{width:calc(var(--u)*26);height:calc(var(--u)*26)}
+#trace{width:min(94%,calc(var(--u)*72));height:calc(var(--u)*14)}
+.tires{display:grid;grid-template-columns:1fr 1fr;gap:calc(var(--u)*.8);
+  width:calc(var(--u)*26)}
+.tire{background:var(--panel);border:1px solid var(--line);
+  border-radius:calc(var(--u)*.9);padding:calc(var(--u)*.8);
+  display:flex;flex-direction:column;gap:calc(var(--u)*.4)}
+.tire .tl{display:flex;justify-content:space-between;
+  font-size:calc(var(--u)*1.1);color:var(--dim);letter-spacing:1px}
+.tire .tt{font-size:calc(var(--u)*2);font-weight:800;font-variant-numeric:tabular-nums}
+.tbar{position:relative;height:calc(var(--u)*.9);background:var(--seg-off);
+  border-radius:calc(var(--u)*.45);overflow:hidden}
+.tbar div{position:absolute;left:0;top:0;bottom:0;border-radius:inherit}
+.score{display:flex;gap:calc(var(--u)*2.2);font-size:calc(var(--u)*1.5);
+  color:var(--dim);font-variant-numeric:tabular-nums;align-items:baseline}
+.score b{color:var(--acc);font-size:calc(var(--u)*2.2)}
 /* rev 바: 바깥(모니터 끝) -> 중앙(게임) */
 .rev{display:flex;gap:calc(var(--u)*.5);height:calc(var(--u)*6.5);
      flex-direction:__FLEXDIR__}
@@ -542,7 +564,18 @@ if(SIDE==='left'){
     <div class="sub dig"><b id="rpm">0</b> / <span id="maxrpm">0</span> RPM
       · <b id="ratio">0</b>%</div>
     <div class="gwrap"><div class="gtrack"><div class="gtick"></div><div id="gdot"></div></div>
-      <div class="glabel"><span>-2G</span><span>LAT <b id="gval">0.0</b>G</span><span>+2G</span></div></div>`;
+      <div class="glabel"><span>-2G</span><span>LAT <b id="gval">0.0</b>G</span><span>+2G</span></div></div>
+    <div class="wrow">
+      <canvas id="gg" class="widget"></canvas>
+      <div class="tires" id="tires"></div>
+    </div>`;
+  for(const wn of ['fl','fr','rl','rr']){
+    const d=document.createElement('div');d.className='tire';
+    d.innerHTML=`<div class="tl"><span>${wn.toUpperCase()}</span><span class="tt" id="tt_${wn}">-</span></div>
+      <div class="tbar"><div id="ts_${wn}"></div></div>
+      <div class="tbar"><div id="tu_${wn}" style="background:var(--dim);opacity:.7"></div></div>`;
+    $('tires').appendChild(d);
+  }
   /* 타코 눈금 (0..100%, 스윕 -120..+120) */
   const tg=$('ticks');
   for(let i=0;i<=10;i++){
@@ -573,8 +606,15 @@ if(SIDE==='left'){
     <div class="big dig"><small>DRIFT ANGLE</small>
       <div><span id="darrow"></span><span id="drift">0</span>°</div>
       <div class="sub">PEAK <b id="dpeak">-</b></div></div>
-    <div class="sub">CLASS <b id="carclass">-</b> · PI <b id="carpi">-</b>
-      · <b id="rpmR">0</b> RPM</div>
+    <div class="wrow">
+      <canvas id="att" class="widget"></canvas>
+      <canvas id="trace" class="widget"></canvas>
+    </div>
+    <div class="score">
+      <span>PK <b id="sPk">0</b>°</span><span>MAX <b id="sG">0.0</b>G</span>
+      <span>드리프트 <b id="sHold">0.0</b>s</span>
+      <span>CLASS <b id="carclass">-</b>·PI <b id="carpi">-</b></span>
+    </div>
     <div class="events panel" id="log" style="padding:calc(var(--u)*1)"></div>`;
   /* 드리프트 다이얼: ±60° -> 화면각 ±75° */
   const tg=$('dticks');
@@ -662,6 +702,7 @@ function render(ts){
     $('dghost').style.transform=`rotate(${clamp(peak*peakSign)/60*75}deg)`;
     $('dghost').style.opacity=peak>=10?.55:0;
   }
+  sampleAndDraw(ts);
   /* rev 바 (바깥->중앙) */
   const over=T.alive&&T.ratio>=T.blink_ratio;
   const lit=D.ratio<=T.start_ratio?0:
@@ -677,6 +718,132 @@ function render(ts){
   });
   $('flash').style.opacity=over?0.8:0;
 }
+/* ===== 위젯 엔진 ===== */
+const BUF=[];let lastSample=0,maxG=0,holdStart=null,holdBest=0;
+function cv(id){const c=$(id);if(!c)return null;
+  const r=c.getBoundingClientRect(),dpr=devicePixelRatio||1;
+  if(c.width!==Math.round(r.width*dpr)){c.width=Math.round(r.width*dpr);
+    c.height=Math.round(r.height*dpr);}
+  const g=c.getContext('2d');g.setTransform(c.width/r.width,0,0,c.height/r.height,0,0);
+  return {g,w:r.width,h:r.height};}
+function css(v){return getComputedStyle(document.body).getPropertyValue(v).trim();}
+
+function sampleAndDraw(ts){
+  const now=performance.now();
+  if(now-lastSample>=33){
+    lastSample=now;
+    BUF.push({t:now,thr:(T.accel||0)/255,brk:(T.brake||0)/255,
+      st:(T.steer||0)/127,hb:(T.handbrake||0)>127,
+      lg:T.alive?(T.lat_g||0):0,gg:T.alive?(T.long_g||0):0});
+    while(BUF.length&&now-BUF[0].t>20000)BUF.shift();
+    const ad=Math.abs(T.alive?T.drift_deg:0);
+    if(T.alive&&Math.abs(T.lat_g||0)>maxG)maxG=Math.abs(T.lat_g);
+    if(ad>15){if(holdStart===null)holdStart=now;
+      holdBest=Math.max(holdBest,(now-holdStart)/1000);}
+    else holdStart=null;
+  }
+  if(SIDE==='left'){drawGG();drawTires();}
+  else{drawAtt();drawTrace();
+    $('sPk').textContent=peak>=10?peak.toFixed(0):'0';
+    $('sG').textContent=maxG.toFixed(1);
+    $('sHold').textContent=holdBest.toFixed(1);}
+}
+
+function drawTires(){
+  const W=(T.wheels)||null;if(!W)return;
+  for(const wn of ['fl','fr','rl','rr']){
+    const d=W[wn];if(!d)continue;
+    const t=d.temp_c||0;
+    const tc=t<60?'var(--blu)':(t<95?'var(--grn)':(t<110?'var(--amb)':'var(--red)'));
+    const tt=$('tt_'+wn);tt.textContent=Math.round(t)+'°';tt.style.color=tc;
+    const cs=Math.min(3,d.combined||0);
+    const sc=cs<1?'var(--grn)':(cs<2?'var(--amb)':'var(--red)');
+    const sb=$('ts_'+wn);sb.style.width=(cs/3*100)+'%';sb.style.background=sc;
+    $('tu_'+wn).style.width=(Math.min(1,Math.max(0,d.sus||0))*100)+'%';
+  }
+}
+
+function drawGG(){
+  const c=cv('gg');if(!c)return;const{g,w,h}=c;
+  g.clearRect(0,0,w,h);
+  const cx=w/2,cy=h/2,R=Math.min(w,h)/2-8,scale=R/2;
+  g.strokeStyle=css('--line');g.lineWidth=1;
+  for(const gr of [0.5,1,1.5,2]){g.beginPath();g.arc(cx,cy,gr*scale,0,7);g.stroke();}
+  g.beginPath();g.moveTo(cx-R,cy);g.lineTo(cx+R,cy);
+  g.moveTo(cx,cy-R);g.lineTo(cx,cy+R);g.stroke();
+  g.fillStyle=css('--dim');g.font='10px Consolas';
+  g.fillText('1G',cx+scale+2,cy-3);g.fillText('2G',cx+2*scale-16,cy-3);
+  const now=performance.now(),acc=css('--acc');
+  for(const p of BUF){const age=(now-p.t)/20000;
+    g.globalAlpha=Math.max(0,0.85*(1-age));
+    g.fillStyle=acc;
+    g.beginPath();g.arc(cx+p.lg*scale,cy-p.gg*scale,2.2,0,7);g.fill();}
+  g.globalAlpha=1;
+  const last=BUF[BUF.length-1];
+  if(last){g.fillStyle=css('--tx');
+    g.beginPath();g.arc(cx+last.lg*scale,cy-last.gg*scale,4.5,0,7);g.fill();}
+}
+
+function drawAtt(){
+  const c=cv('att');if(!c)return;const{g,w,h}=c;
+  g.clearRect(0,0,w,h);
+  const cx=w/2,cy=h/2,R=Math.min(w,h)/2-8;
+  g.strokeStyle=css('--line');g.beginPath();g.arc(cx,cy,R,0,7);g.stroke();
+  g.strokeStyle=css('--dim');g.lineWidth=2;g.setLineDash([4,4]);
+  g.beginPath();g.moveTo(cx,cy+R*0.75);g.lineTo(cx,cy-R*0.75);g.stroke();
+  g.setLineDash([]);
+  g.beginPath();g.moveTo(cx,cy-R*0.8);g.lineTo(cx-6,cy-R*0.62);
+  g.lineTo(cx+6,cy-R*0.62);g.closePath();g.fillStyle=css('--dim');g.fill();
+  g.save();g.translate(cx,cy);g.rotate((D.drift||0)*Math.PI/180);
+  const L=R*1.05,W2=L*0.42;
+  g.fillStyle=css('--acc');g.globalAlpha=0.9;
+  g.beginPath();
+  g.moveTo(0,-L/2);
+  g.quadraticCurveTo(W2/2,-L/2, W2/2,-L/4);g.lineTo(W2/2,L/2-6);
+  g.quadraticCurveTo(W2/2,L/2, W2/4,L/2);g.lineTo(-W2/4,L/2);
+  g.quadraticCurveTo(-W2/2,L/2, -W2/2,L/2-6);g.lineTo(-W2/2,-L/4);
+  g.quadraticCurveTo(-W2/2,-L/2, 0,-L/2);g.fill();
+  g.globalAlpha=1;
+  const sa=(T.steer||0)/127*0.6;
+  for(const sx of [-W2/2+3,W2/2-3]){
+    g.save();g.translate(sx,-L/4);g.rotate(sa);
+    g.fillStyle=css('--tx');g.fillRect(-2.5,-8,5,16);g.restore();}
+  g.restore();
+  g.fillStyle=css('--tx');g.font='bold 16px Segoe UI';g.textAlign='center';
+  g.fillText(Math.abs(D.drift||0).toFixed(0)+String.fromCharCode(176),cx,cy+R-4);
+  g.textAlign='left';
+}
+
+function drawTrace(){
+  const c=cv('trace');if(!c)return;const{g,w,h}=c;
+  g.clearRect(0,0,w,h);
+  const now=performance.now(),WIN=10000;
+  const x=t=>w-(now-t)/WIN*w;
+  g.fillStyle=css('--pur');g.globalAlpha=0.22;
+  let hb0=null;
+  for(const p of BUF){if(now-p.t>WIN)continue;
+    if(p.hb&&hb0===null)hb0=p.t;
+    if(!p.hb&&hb0!==null){g.fillRect(x(hb0),0,x(p.t)-x(hb0),h);hb0=null;}}
+  if(hb0!==null)g.fillRect(x(hb0),0,w-x(hb0),h);
+  g.globalAlpha=1;
+  g.strokeStyle=css('--line');g.beginPath();g.moveTo(0,h/2);g.lineTo(w,h/2);g.stroke();
+  const series=[
+    ['thr',v=>h-4-v*(h-8),css('--grn'),2],
+    ['brk',v=>h-4-v*(h-8),css('--red'),2],
+    ['st', v=>h/2-v*(h/2-6),css('--acc'),2.5],
+  ];
+  for(const [key,fy,color,lw] of series){
+    g.strokeStyle=color;g.lineWidth=lw;g.beginPath();let started=false;
+    for(const p of BUF){if(now-p.t>WIN)continue;
+      const px=x(p.t),py=fy(p[key]);
+      if(!started){g.moveTo(px,py);started=true;}else g.lineTo(px,py);}
+    g.stroke();}
+  g.fillStyle=css('--dim');g.font='10px Consolas';
+  g.fillText('THR',6,12);g.fillStyle=css('--grn');g.fillRect(32,5,14,3);
+  g.fillStyle=css('--dim');g.fillText('BRK',54,12);g.fillStyle=css('--red');g.fillRect(80,5,14,3);
+  g.fillStyle=css('--dim');g.fillText('STEER',102,12);g.fillStyle=css('--acc');g.fillRect(140,5,14,3);
+}
+
 function loop(ts){render(ts);requestAnimationFrame(loop);}
 requestAnimationFrame(loop);
 setInterval(()=>{if(performance.now()-lastRender>200)render(performance.now());},250);
