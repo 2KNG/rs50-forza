@@ -114,6 +114,34 @@ class Rs50Led:
         d.call(a, 6, commit, t, r)                                # COMMIT (byte5=0x0A)
         d.call(a, 7, bytes([0, 0, 0]), t, r)                      # REFRESH
 
+    # ---- 경량 레벨 경로 (주행 중 전용 — FFB 안전) ----
+    # G PRO식 프로토콜을 RS50이 수용함을 실기 확인 (2026-07-20).
+    # 색/채움방향은 슬롯0+이펙트에서 오고, "몇 칸(0-10)"만 fire-and-forget 전송.
+    # NVM 미접촉이라 G HUB 실측 127Hz까지도 FFB 무사.
+
+    def _short_ff(self, fn, params=b"\x00\x00\x00"):
+        from src.hidpp import DEV_IDX, SW_ID
+        req = bytes([0x10, DEV_IDX, self.idx_a, ((fn & 0xF) << 4) | SW_ID]) + params
+        self.dev.h_short.write(req + b"\x00" * (7 - len(req)))
+
+    def arm_level(self, effect=2):
+        """레벨 모드 진입 (1회 암 버스트). effect: 1=중앙발산 2=중앙수렴 3=RL 4=LR."""
+        with self.dev._lock:
+            for fn, pr in ((0, b"\x00\x00\x00"), (1, b"\x00\x00\x00"),
+                           (2, b"\x00\x00\x00"), (3, bytes([effect, 0, 0])),
+                           (0, b"\x00\x00\x00")):
+                self._short_ff(fn, pr)
+                time.sleep(0.005)
+
+    def set_level(self, v):
+        """점등 칸수 0-10 전송 (fire-and-forget 페어, 응답 대기 없음)."""
+        from src.hidpp import DEV_IDX, SW_ID
+        with self.dev._lock:
+            self._short_ff(2)
+            p = bytes([0x00, 0x01, 0x00, NUM_LEDS, 0x00, v & 0xFF])
+            req = bytes([0x11, DEV_IDX, self.idx_a, (6 << 4) | SW_ID]) + p
+            self.dev.h_long.write(req + b"\x00" * (20 - len(req)))
+
     def write_fast(self, colors):
         """중간 갱신: fn2 쓰기 + fn6 commit + fn7 refresh (3콜).
 
@@ -170,9 +198,42 @@ class Rs50Led:
                 mode="center", blink_hz=10.0, idle=False):
         """텔레메트리 루프에서 주기 호출. 상태 변화 시에만 실제 전송.
 
-        idle=True(메뉴/완전 정차)면 rev 대신 물결 애니메이션 표시.
+        idle=True(메뉴) = RGB 물결. 주행 중 = 경량 레벨 경로 (FFB 안전).
         """
         now = time.time()
+        if not idle:
+            # ---- 주행: 레벨 경로 ----
+            if getattr(self, "_path", None) != "level":
+                self.arm_level()
+                self._path = "level"
+                self._last_frame = None
+            if rpm_ratio >= blink_ratio:
+                if blink_hz > 0:
+                    lv = 10 if (int(now * blink_hz * 2) % 2) == 0 else 0
+                else:
+                    lv = 10
+            elif rpm_ratio < start_ratio:
+                lv = 0
+            else:
+                lv = min(10, max(1, round(
+                    (rpm_ratio - start_ratio) / (blink_ratio - start_ratio) * 10)))
+            key = ("lv", lv)
+            if key == self._last_frame or now - self._last_send < 0.03:
+                return
+            self.set_level(lv)
+            self._last_frame = key
+            self._last_send = now
+            return
+        # ---- 메뉴: RGB 물결 경로 ----
+        if getattr(self, "_path", None) != "rgb":
+            # 레벨 모드에서 복귀: effect 5(static) 포함 풀 시퀀스로 표시 기준 재설정
+            try:
+                self.set_level(0)
+                self.write_frame([OFF] * NUM_LEDS)
+            except Exception:
+                pass
+            self._path = "rgb"
+            self._last_frame = None
         if idle:
             # 메뉴 전용(FFB 비활성) -> 10fps로 부드럽게
             key = ("wave", int(now * 10))

@@ -257,8 +257,11 @@ class TestLedRender(unittest.TestCase):
         led._last_frame = None
         led._last_send = 0.0
         led.sent = []
+        led.levels = []
         led.write_fast = lambda c: led.sent.append(("fast", list(c)))
         led.write_frame = lambda c, direction=None: led.sent.append(("full", list(c)))
+        led.arm_level = lambda effect=2: None
+        led.set_level = lambda v: led.levels.append(v)
         return led
 
     def test_ltr_fill_counts(self):
@@ -274,13 +277,20 @@ class TestLedRender(unittest.TestCase):
         self.assertEqual(frame[4], (255, 0, 0))
         self.assertEqual(frame[9], PRESETS["f1"]["ltr"][9])
 
-    def test_set_rpm_dedup(self):
+    def test_set_rpm_dedup_level_path(self):
         led = self._led()
         led.set_rpm(0.6)
-        led.set_rpm(0.6)  # 같은 단계 -> 전송 1회만
-        self.assertEqual(len(led.sent), 1)
-        led.set_rpm(0.7)  # 단계 변화 -> 추가 전송
-        self.assertEqual(len(led.sent), 2)
+        led.set_rpm(0.6)  # 같은 레벨 -> 전송 1회만
+        self.assertEqual(led.levels, [2])
+        time.sleep(0.04)  # 최소 간격(0.03) 경과
+        led.set_rpm(0.7)  # 레벨 변화 -> 추가 전송
+        self.assertEqual(led.levels, [2, 4])
+        self.assertEqual(led.sent, [], "주행 중엔 RGB 쓰기 없음 (FFB 보호)")
+
+    def test_overrev_solid_level(self):
+        led = self._led()
+        led.set_rpm(0.98, blink_hz=0)  # 오버레브 + 점멸 꺼짐 -> 레벨 10 고정
+        self.assertEqual(led.levels, [10])
 
     def test_idle_wave_animates(self):
         led = self._led()
