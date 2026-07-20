@@ -43,6 +43,7 @@ _DASH_TABLES = {
         "handbrake": (306, "<B"), "gear": (307, "<B"), "steer": (308, "<b"),
     },
     324: {  # Horizon (FH4/FH5/FH6): sled 뒤 12B(CarGroup 등) -> dash 구간 +12
+        "pos_x": (244, "<f"), "pos_y": (248, "<f"), "pos_z": (252, "<f"),
         "speed": (256, "<f"), "power": (260, "<f"), "torque": (264, "<f"),
         "temp_fl": (268, "<f"), "temp_fr": (272, "<f"),  # 타이어 온도 (F)
         "temp_rl": (276, "<f"), "temp_rr": (280, "<f"),
@@ -80,6 +81,9 @@ class TelemetryState:
         self.car_class = 0
         self.car_pi = 0
         self.handbrake = 0
+        self.pos_x = 0.0
+        self.pos_y = 0.0
+        self.pos_z = 0.0
         for w in ("fl", "fr", "rl", "rr"):
             setattr(self, f"sr_{w}", 0.0)
             setattr(self, f"sa_{w}", 0.0)

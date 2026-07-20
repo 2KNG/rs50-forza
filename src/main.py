@@ -146,6 +146,7 @@ def main():
                 "car_pi": state.car_pi,
                 "car_class": state.car_class,
                 "wheels": state.wheels(),
+                "pos_x": state.pos_x, "pos_z": state.pos_z,
                 "events": list(EVENTS),
             }
         port = wcfg.get("port", 8777)

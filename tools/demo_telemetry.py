@@ -83,6 +83,10 @@ def pkt(t):
         struct.pack_into("<f", b, 268 + i * 4,
                          base_t + (25 if rear else 0) + i * 3)  # temp F
 
+    # 주행 라인: 큰 원 + 드리프트 흔들림
+    th = t * 0.25
+    struct.pack_into("<f", b, 244, 300 * math.cos(th) + 8 * math.sin(t * 2))
+    struct.pack_into("<f", b, 252, 300 * math.sin(th) + 8 * math.cos(t * 1.7))
     struct.pack_into("<i", b, 212, 3296)   # car ordinal (데모)
     struct.pack_into("<i", b, 216, 5)      # S2
     struct.pack_into("<i", b, 220, 998)    # PI

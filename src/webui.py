@@ -409,9 +409,10 @@ main{flex:1;display:flex;flex-direction:column;justify-content:center;
            letter-spacing:4px;margin-bottom:calc(var(--u)*.5)}
 #gear{font-size:calc(var(--u)*26);font-weight:800;line-height:.95;
       transition:transform .12s}
-#speed{font-size:calc(var(--u)*15);font-weight:800;line-height:1;
-       font-variant-numeric:tabular-nums}
-#speedA{font-size:calc(var(--u)*8);font-weight:800;font-variant-numeric:tabular-nums}
+#speed{font-size:calc(var(--u)*16);font-weight:200;line-height:1;
+       letter-spacing:calc(var(--u)*-0.4);font-variant-numeric:tabular-nums}
+#speedA{font-size:calc(var(--u)*10);font-weight:200;
+  letter-spacing:calc(var(--u)*-0.25);font-variant-numeric:tabular-nums}
 #drift{font-size:calc(var(--u)*21);font-weight:800;line-height:1;color:var(--acc);
        font-variant-numeric:tabular-nums}
 #driftA{font-size:calc(var(--u)*6.5);font-weight:800;color:var(--acc);
@@ -460,7 +461,8 @@ canvas.widget{background:var(--panel);border:1px solid var(--line);
   border-radius:calc(var(--u)*1.2)}
 #gg{width:calc(var(--u)*24);height:calc(var(--u)*24)}
 #att{width:calc(var(--u)*26);height:calc(var(--u)*26)}
-#trace{width:min(94%,calc(var(--u)*72));height:calc(var(--u)*14)}
+#trace{width:min(94%,calc(var(--u)*72));height:calc(var(--u)*12)}
+#map{width:calc(var(--u)*20);height:calc(var(--u)*20)}
 .tires{display:grid;grid-template-columns:1fr 1fr;gap:calc(var(--u)*.8);
   width:calc(var(--u)*26)}
 .tire{background:var(--panel);border:1px solid var(--line);
@@ -476,9 +478,9 @@ canvas.widget{background:var(--panel);border:1px solid var(--line);
   color:var(--dim);font-variant-numeric:tabular-nums;align-items:baseline}
 .score b{color:var(--acc);font-size:calc(var(--u)*2.2)}
 /* rev 바: 바깥(모니터 끝) -> 중앙(게임) */
-.rev{display:flex;gap:calc(var(--u)*.5);height:calc(var(--u)*6.5);
-     flex-direction:__FLEXDIR__}
-.rev div{flex:1;border-radius:calc(var(--u)*.6);background:var(--seg-off);
+.rev{display:flex;gap:calc(var(--u)*.9);height:calc(var(--u)*2.4);
+     width:min(96%,calc(var(--u)*86));margin:0 auto;flex-direction:__FLEXDIR__}
+.rev div{flex:1;border-radius:calc(var(--u)*1.2);background:var(--seg-off);
   border:1px solid var(--line);transition:background .05s,box-shadow .05s}
 /* 테마 */
 body[data-theme=pit]{--bg:#0b0e14;--panel:#141922;--line:#232b38;--tx:#e6edf3;
@@ -518,7 +520,7 @@ body[data-theme=neon] #gear,body[data-theme=neon] #gearA{
 <div class="rev" id="rev"></div>
 <main id="main"></main>
 <script>
-const SIDE='__SIDE__', N=24;
+const SIDE='__SIDE__', N=12;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 const THEMES=[['pit','PIT'],['f1','F1'],['retro','RETRO'],['minimal','OLED'],['neon','NEON']];
@@ -608,8 +610,9 @@ if(SIDE==='left'){
       <div class="sub">PEAK <b id="dpeak">-</b></div></div>
     <div class="wrow">
       <canvas id="att" class="widget"></canvas>
-      <canvas id="trace" class="widget"></canvas>
+      <canvas id="map" class="widget"></canvas>
     </div>
+    <canvas id="trace" class="widget"></canvas>
     <div class="score">
       <span>PK <b id="sPk">0</b>°</span><span>MAX <b id="sG">0.0</b>G</span>
       <span>드리프트 <b id="sHold">0.0</b>s</span>
@@ -734,7 +737,8 @@ function sampleAndDraw(ts){
     lastSample=now;
     BUF.push({t:now,thr:(T.accel||0)/255,brk:(T.brake||0)/255,
       st:(T.steer||0)/127,hb:(T.handbrake||0)>127,
-      lg:T.alive?(T.lat_g||0):0,gg:T.alive?(T.long_g||0):0});
+      lg:T.alive?(T.lat_g||0):0,gg:T.alive?(T.long_g||0):0,
+      px:T.pos_x||0,pz:T.pos_z||0});
     while(BUF.length&&now-BUF[0].t>20000)BUF.shift();
     const ad=Math.abs(T.alive?T.drift_deg:0);
     if(T.alive&&Math.abs(T.lat_g||0)>maxG)maxG=Math.abs(T.lat_g);
@@ -743,7 +747,7 @@ function sampleAndDraw(ts){
     else holdStart=null;
   }
   if(SIDE==='left'){drawGG();drawTires();}
-  else{drawAtt();drawTrace();
+  else{drawAtt();drawTrace();drawMap();
     $('sPk').textContent=peak>=10?peak.toFixed(0):'0';
     $('sG').textContent=maxG.toFixed(1);
     $('sHold').textContent=holdBest.toFixed(1);}
@@ -766,22 +770,36 @@ function drawTires(){
 function drawGG(){
   const c=cv('gg');if(!c)return;const{g,w,h}=c;
   g.clearRect(0,0,w,h);
-  const cx=w/2,cy=h/2,R=Math.min(w,h)/2-8,scale=R/2;
+  const cx=w/2,cy=h/2,R=Math.min(w,h)/2-10,scale=R/2;
+  /* M 스타일: 1G 강조 링 + 크로스헤어 */
   g.strokeStyle=css('--line');g.lineWidth=1;
-  for(const gr of [0.5,1,1.5,2]){g.beginPath();g.arc(cx,cy,gr*scale,0,7);g.stroke();}
+  for(const gr of [0.5,1.5]){g.beginPath();g.arc(cx,cy,gr*scale,0,7);g.stroke();}
+  g.strokeStyle=css('--dim');g.lineWidth=1.5;
+  g.beginPath();g.arc(cx,cy,1*scale,0,7);g.stroke();
+  g.beginPath();g.arc(cx,cy,2*scale,0,7);g.stroke();
+  g.strokeStyle=css('--line');
   g.beginPath();g.moveTo(cx-R,cy);g.lineTo(cx+R,cy);
   g.moveTo(cx,cy-R);g.lineTo(cx,cy+R);g.stroke();
   g.fillStyle=css('--dim');g.font='10px Consolas';
-  g.fillText('1G',cx+scale+2,cy-3);g.fillText('2G',cx+2*scale-16,cy-3);
+  g.fillText('1',cx+scale-8,cy-4);g.fillText('2',cx+2*scale-10,cy-4);
   const now=performance.now(),acc=css('--acc');
   for(const p of BUF){const age=(now-p.t)/20000;
-    g.globalAlpha=Math.max(0,0.85*(1-age));
+    g.globalAlpha=Math.max(0,0.8*(1-age));
     g.fillStyle=acc;
     g.beginPath();g.arc(cx+p.lg*scale,cy-p.gg*scale,2.2,0,7);g.fill();}
   g.globalAlpha=1;
   const last=BUF[BUF.length-1];
-  if(last){g.fillStyle=css('--tx');
-    g.beginPath();g.arc(cx+last.lg*scale,cy-last.gg*scale,4.5,0,7);g.fill();}
+  if(last){
+    g.fillStyle=css('--tx');
+    g.beginPath();g.arc(cx+last.lg*scale,cy-last.gg*scale,5,0,7);g.fill();
+    /* 중앙 G값 대형 표기 (BMW M 방식) */
+    const cur=Math.hypot(last.lg,last.gg);
+    g.font='200 26px Segoe UI';g.textAlign='center';g.fillStyle=css('--tx');
+    g.fillText(cur.toFixed(1),cx,cy-8);
+    g.font='10px Consolas';g.fillStyle=css('--dim');
+    g.fillText('G · PK '+maxG.toFixed(1),cx,cy+8);
+    g.textAlign='left';
+  }
 }
 
 function drawAtt(){
@@ -812,6 +830,32 @@ function drawAtt(){
   g.fillStyle=css('--tx');g.font='bold 16px Segoe UI';g.textAlign='center';
   g.fillText(Math.abs(D.drift||0).toFixed(0)+String.fromCharCode(176),cx,cy+R-4);
   g.textAlign='left';
+}
+
+function drawMap(){
+  const c=cv('map');if(!c)return;const{g,w,h}=c;
+  g.clearRect(0,0,w,h);
+  const pts=BUF.filter(p=>p.px||p.pz);
+  g.fillStyle=css('--dim');g.font='10px Consolas';g.fillText('LINE',6,12);
+  if(pts.length<2)return;
+  let x0=1e12,x1=-1e12,z0=1e12,z1=-1e12;
+  for(const p of pts){x0=Math.min(x0,p.px);x1=Math.max(x1,p.px);
+    z0=Math.min(z0,p.pz);z1=Math.max(z1,p.pz);}
+  const span=Math.max(x1-x0,z1-z0,10),pad=12;
+  const sx=p=>pad+((p.px-x0)/span)*(w-2*pad);
+  const sy=p=>h-pad-((p.pz-z0)/span)*(h-2*pad);
+  const now=performance.now(),acc=css('--acc');
+  g.lineWidth=2;g.lineCap='round';
+  for(let i=1;i<pts.length;i++){
+    const age=(now-pts[i].t)/20000;
+    g.globalAlpha=Math.max(0.05,0.9*(1-age));
+    g.strokeStyle=acc;
+    g.beginPath();g.moveTo(sx(pts[i-1]),sy(pts[i-1]));
+    g.lineTo(sx(pts[i]),sy(pts[i]));g.stroke();}
+  g.globalAlpha=1;
+  const lp=pts[pts.length-1];
+  g.fillStyle=css('--tx');
+  g.beginPath();g.arc(sx(lp),sy(lp),4,0,7);g.fill();
 }
 
 function drawTrace(){
