@@ -24,6 +24,15 @@ _SLED = {
     "car_ordinal": (212, "<i"),  # 차량 고유 ID (차별 학습/표시용)
     "car_class":   (216, "<i"),  # 0=D..7=X
     "car_pi":      (220, "<i"),  # 퍼포먼스 인덱스
+    # 4륜 타이어/서스 (FL, FR, RL, RR)
+    "sr_fl": (76, "<f"), "sr_fr": (80, "<f"),   # 슬립비 (구동 슬립)
+    "sr_rl": (84, "<f"), "sr_rr": (88, "<f"),
+    "sa_fl": (156, "<f"), "sa_fr": (160, "<f"),  # 슬립각
+    "sa_rl": (164, "<f"), "sa_rr": (168, "<f"),
+    "cs_fl": (172, "<f"), "cs_fr": (176, "<f"),  # 복합 슬립 (1=그립 한계)
+    "cs_rl": (180, "<f"), "cs_rr": (184, "<f"),
+    "sus_fl": (188, "<f"), "sus_fr": (192, "<f"),  # 서스 트래블 (0~1 정규화)
+    "sus_rl": (196, "<f"), "sus_rr": (200, "<f"),
 }
 
 # 패킷 크기별 dash 구간 오프셋
@@ -35,6 +44,8 @@ _DASH_TABLES = {
     },
     324: {  # Horizon (FH4/FH5/FH6): sled 뒤 12B(CarGroup 등) -> dash 구간 +12
         "speed": (256, "<f"), "power": (260, "<f"), "torque": (264, "<f"),
+        "temp_fl": (268, "<f"), "temp_fr": (272, "<f"),  # 타이어 온도 (F)
+        "temp_rl": (276, "<f"), "temp_rr": (280, "<f"),
         "accel": (315, "<B"), "brake": (316, "<B"), "clutch": (317, "<B"),
         "handbrake": (318, "<B"), "gear": (319, "<B"), "steer": (320, "<b"),
     },
@@ -68,6 +79,26 @@ class TelemetryState:
         self.car_ordinal = 0
         self.car_class = 0
         self.car_pi = 0
+        self.handbrake = 0
+        for w in ("fl", "fr", "rl", "rr"):
+            setattr(self, f"sr_{w}", 0.0)
+            setattr(self, f"sa_{w}", 0.0)
+            setattr(self, f"cs_{w}", 0.0)
+            setattr(self, f"sus_{w}", 0.0)
+            setattr(self, f"temp_{w}", 0.0)
+
+    def wheels(self):
+        """4륜 데이터 스냅샷: {fl:{slip,angle,combined,sus,temp_c},...}"""
+        out = {}
+        for w in ("fl", "fr", "rl", "rr"):
+            out[w] = {
+                "slip": getattr(self, f"sr_{w}"),
+                "angle": getattr(self, f"sa_{w}"),
+                "combined": getattr(self, f"cs_{w}"),
+                "sus": getattr(self, f"sus_{w}"),
+                "temp_c": (getattr(self, f"temp_{w}") - 32) * 5 / 9,  # F->C
+            }
+        return out
 
     @property
     def alive(self):

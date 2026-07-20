@@ -138,9 +138,14 @@ def main():
                 "blink_hz": lcfg.get("blink_hz", 5),
                 "seg_colors": _seg_colors(lcfg),
                 "lat_g": state.lat_g,
+                "long_g": state.accel_z / 9.81,
                 "drift_deg": state.drift_deg,
+                "yaw_rate": state.ang_vel_y,
+                "steer": state.steer,
+                "handbrake": state.handbrake,
                 "car_pi": state.car_pi,
                 "car_class": state.car_class,
+                "wheels": state.wheels(),
                 "events": list(EVENTS),
             }
         port = wcfg.get("port", 8777)
