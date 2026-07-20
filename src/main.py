@@ -63,15 +63,23 @@ class LedThread(threading.Thread):
 
     def run(self):
         race_leds = self.lcfg.get("race_leds", False)
+        was_alive = False
         while not self._stop.is_set():
             s = self.state
             try:
                 if s.alive and not race_leds:
+                    if not was_alive:
+                        was_alive = True
+                        # 주행 진입 시 1회만 소등 (물결 잔상 제거) 후 완전 침묵
+                        from src.ledctl import OFF, NUM_LEDS
+                        self.led.write_fast([OFF] * NUM_LEDS)
+                        self.led._path = None
                     # 주행 중 LED 완전 침묵 — RS50은 FFB와 LED가 USB 컨트롤
                     # 파이프를 공유해 어떤 전송이든 FFB를 해침 (실주행 확정).
                     # rev 게이지는 웹 대시보드가 담당.
                     time.sleep(0.05)
                     continue
+                was_alive = s.alive
                 self.led.set_rpm(
                     s.rpm_ratio if s.alive else 0.0,
                     start_ratio=self.lcfg.get("start_ratio", 0.5),
