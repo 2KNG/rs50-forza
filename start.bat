@@ -11,8 +11,8 @@ echo   Dashboard: http://127.0.0.1:8777
 echo   Quit: Ctrl+C in this window
 echo ============================================
 
-rem open dashboard after 3s (wait for app startup)
-start "" /min cmd /c "timeout /t 3 >nul & start http://127.0.0.1:8777"
+rem open side dashboards on left/right monitors after 3s (auto-detect layout)
+start "" /min powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Sleep 3; & '%~dp0tools\open_dashboards.ps1'"
 
 python -m src.main --monitor
 
