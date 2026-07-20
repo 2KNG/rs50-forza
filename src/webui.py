@@ -378,111 +378,222 @@ SIDE_TMPL = r"""<!doctype html>
 *{margin:0;box-sizing:border-box;font-family:'Segoe UI',system-ui,sans-serif}
 html,body{height:100%}
 body{background:var(--bg);color:var(--tx);display:flex;flex-direction:column;
-     padding:calc(var(--u)*2);gap:calc(var(--u)*1.6);overflow:hidden}
+     padding:calc(var(--u)*1.6);gap:calc(var(--u)*1.4);overflow:hidden}
 #flash{position:fixed;inset:0;pointer-events:none;z-index:1;opacity:0;
   box-shadow:inset 0 0 calc(var(--u)*16) calc(var(--u)*3) var(--pur);
   transition:opacity .06s}
-.top{display:flex;align-items:center;gap:calc(var(--u)*1.2)}
-.brand{font-weight:800;letter-spacing:3px;font-size:calc(var(--u)*1.4);color:var(--dim)}
-.dot{width:calc(var(--u)*1);height:calc(var(--u)*1);border-radius:50%;background:#444;
-     margin-left:auto}
+.top{display:flex;align-items:center;gap:calc(var(--u)*1);flex-wrap:wrap}
+.brand{font-weight:800;letter-spacing:3px;font-size:calc(var(--u)*1.3);color:var(--dim)}
+.dot{width:calc(var(--u)*.9);height:calc(var(--u)*.9);border-radius:50%;background:#444}
 .dot.on{background:var(--grn);box-shadow:0 0 calc(var(--u)*1) var(--grn)}
-.badge{font-size:calc(var(--u)*1.5);font-weight:800;letter-spacing:2px;
-  padding:calc(var(--u)*.6) calc(var(--u)*1.5);border-radius:calc(var(--u)*.8)}
+.badge{font-size:calc(var(--u)*1.3);font-weight:800;letter-spacing:2px;
+  padding:calc(var(--u)*.5) calc(var(--u)*1.2);border-radius:calc(var(--u)*.7)}
 .badge.auto{background:#0d2d18;color:var(--grn)}
 .badge.manual{background:#332309;color:var(--amb);animation:pulse 1.6s infinite}
 .badge.off{background:#22262e;color:var(--dim)}
 .badge.lost{background:#33090c;color:var(--red)}
 @keyframes pulse{50%{box-shadow:0 0 calc(var(--u)*1.4) rgba(255,176,32,.5)}}
+.switchers{margin-left:auto;display:flex;gap:calc(var(--u)*1.4)}
+.sw{display:flex;gap:calc(var(--u)*.4)}
+.sw button{background:var(--panel);color:var(--dim);border:1px solid var(--line);
+  border-radius:calc(var(--u)*.6);padding:calc(var(--u)*.4) calc(var(--u)*.9);
+  font-size:calc(var(--u)*.95);letter-spacing:1px;cursor:pointer}
+.sw button.on{color:var(--tx);border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
+.panel{background:var(--panel);border:1px solid var(--line);
+  border-radius:calc(var(--u)*1.2)}
 main{flex:1;display:flex;flex-direction:column;justify-content:center;
-     align-items:center;gap:calc(var(--u)*2);min-height:0}
+     align-items:center;gap:calc(var(--u)*1.6);min-height:0}
 .big{text-align:center}
-.big small{display:block;font-size:calc(var(--u)*1.6);color:var(--dim);
-           letter-spacing:4px;margin-bottom:calc(var(--u)*.6)}
-#gear{font-size:calc(var(--u)*30);font-weight:800;line-height:.95;
+.big small{display:block;font-size:calc(var(--u)*1.5);color:var(--dim);
+           letter-spacing:4px;margin-bottom:calc(var(--u)*.5)}
+#gear{font-size:calc(var(--u)*26);font-weight:800;line-height:.95;
       transition:transform .12s}
-#speed{font-size:calc(var(--u)*17);font-weight:800;line-height:1;
+#speed{font-size:calc(var(--u)*15);font-weight:800;line-height:1;
        font-variant-numeric:tabular-nums}
-#drift{font-size:calc(var(--u)*24);font-weight:800;line-height:1;color:var(--acc);
+#speedA{font-size:calc(var(--u)*8);font-weight:800;font-variant-numeric:tabular-nums}
+#drift{font-size:calc(var(--u)*21);font-weight:800;line-height:1;color:var(--acc);
        font-variant-numeric:tabular-nums}
-#darrow{font-size:calc(var(--u)*10);vertical-align:middle}
-.sub{font-size:calc(var(--u)*2.6);color:var(--dim);font-variant-numeric:tabular-nums}
+#driftA{font-size:calc(var(--u)*6.5);font-weight:800;color:var(--acc);
+        font-variant-numeric:tabular-nums}
+#darrow,#darrowA{font-size:.55em;vertical-align:middle}
+.sub{font-size:calc(var(--u)*2.2);color:var(--dim);font-variant-numeric:tabular-nums}
 .sub b{color:var(--tx)}
 .pop{transform:scale(1.12)!important}
-/* 횡G 대형 미터 */
-.gwrap{width:min(80%,calc(var(--u)*56))}
-.gtrack{position:relative;height:calc(var(--u)*2.4);background:var(--seg-off);
-  border:1px solid var(--line);border-radius:calc(var(--u)*1.2)}
+/* 게이지 (SVG) */
+.gauge{position:relative}
+.gauge svg{display:block}
+.tick{stroke:var(--gauge-dim)} .tick.red{stroke:var(--red)}
+.tlabel{fill:var(--gauge-dim)}
+.needle{stroke:var(--gauge-fg);filter:drop-shadow(0 0 3px rgba(0,0,0,.6))}
+.ghost{stroke:var(--acc);opacity:.55}
+.hub{fill:var(--gauge-fg)}
+.gunit{fill:var(--gauge-dim)}
+#tachoWrap svg{width:calc(var(--u)*40);height:calc(var(--u)*40)}
+#driftGWrap svg{width:calc(var(--u)*48);height:calc(var(--u)*30)}
+#gearA{position:absolute;left:50%;top:63%;transform:translate(-50%,-50%);
+  font-size:calc(var(--u)*8);font-weight:800;transition:transform .12s}
+#gearA.pop{transform:translate(-50%,-50%) scale(1.12)!important}
+/* 횡G */
+.gwrap{width:min(82%,calc(var(--u)*54))}
+.gtrack{position:relative;height:calc(var(--u)*2.2);background:var(--seg-off);
+  border:1px solid var(--line);border-radius:calc(var(--u)*1.1)}
 .gtick{position:absolute;left:50%;top:0;bottom:0;width:2px;background:var(--dim);opacity:.5}
-#gdot{position:absolute;top:50%;left:50%;width:calc(var(--u)*2);height:calc(var(--u)*2);
+#gdot{position:absolute;top:50%;left:50%;width:calc(var(--u)*1.8);height:calc(var(--u)*1.8);
   border-radius:50%;background:var(--acc);transform:translate(-50%,-50%);
-  box-shadow:0 0 calc(var(--u)*1.4) var(--acc)}
+  box-shadow:0 0 calc(var(--u)*1.3) var(--acc)}
 .glabel{display:flex;justify-content:space-between;color:var(--dim);
-  font-size:calc(var(--u)*1.3);margin-top:calc(var(--u)*.4)}
-/* 이벤트 (right 전용) */
-.events{width:100%;max-height:calc(var(--u)*22);overflow:hidden;
-  font:calc(var(--u)*1.5)/1.8 Consolas,monospace}
+  font-size:calc(var(--u)*1.2);margin-top:calc(var(--u)*.4)}
+/* 이벤트 */
+.events{width:100%;max-height:calc(var(--u)*18);overflow:hidden;
+  font:calc(var(--u)*1.4)/1.8 Consolas,monospace}
 .events div{color:var(--dim);animation:fadein .4s ease}
 .events div b{color:var(--tx)}
 @keyframes fadein{from{opacity:0;transform:translateY(-4px)}to{opacity:1}}
-/* rev 바: 바깥(모니터 끝) -> 중앙(게임) 방향으로 차오름 */
-.rev{display:flex;gap:calc(var(--u)*.5);height:calc(var(--u)*7);
+/* 표시 모드 전환 */
+body[data-display=digital] .ana{display:none!important}
+body[data-display=analog] .dig{display:none!important}
+/* rev 바: 바깥(모니터 끝) -> 중앙(게임) */
+.rev{display:flex;gap:calc(var(--u)*.5);height:calc(var(--u)*6.5);
      flex-direction:__FLEXDIR__}
 .rev div{flex:1;border-radius:calc(var(--u)*.6);background:var(--seg-off);
   border:1px solid var(--line);transition:background .05s,box-shadow .05s}
 /* 테마 */
 body[data-theme=pit]{--bg:#0b0e14;--panel:#141922;--line:#232b38;--tx:#e6edf3;
-  --dim:#8b98a9;--acc:#3b6cff}
-body[data-theme=f1]{--bg:#08080a;--line:#26262c;--tx:#fff;--dim:#77777f;--acc:#e10600;
+  --dim:#8b98a9;--acc:#3b6cff;--gauge-fg:#e6edf3;--gauge-dim:#8b98a9}
+body[data-theme=f1]{--bg:#08080a;--panel:#111114;--line:#26262c;--tx:#fff;
+  --dim:#77777f;--acc:#e10600;--gauge-fg:#fff;--gauge-dim:#77777f;
   background-image:repeating-linear-gradient(45deg,#0a0a0d 0 3px,#08080a 3px 6px)}
-body[data-theme=f1] #gear,body[data-theme=f1] #speed{font-style:italic}
-body[data-theme=retro]{--bg:#0d0a06;--line:#3a2c14;--tx:#ffd9a0;--dim:#9c7b4a;
-  --acc:#ffb020;--seg-off:#221808}
-body[data-theme=minimal]{--bg:#000;--line:#111;--tx:#ddd;--dim:#555;--acc:#888;
-  --seg-off:#111}
-body[data-theme=neon]{--bg:#0d0221;--line:#3b1a6e;--tx:#f3e9ff;--dim:#8f7bb8;
-  --acc:#ff2bd6;--seg-off:#1d1040;
+body[data-theme=f1] .panel{border-left:3px solid var(--acc)}
+body[data-theme=f1] #gear,body[data-theme=f1] #speed,body[data-theme=f1] #gearA
+  {font-style:italic}
+body[data-theme=retro]{--bg:#0d0a06;--panel:#161007;--line:#3a2c14;--tx:#ffd9a0;
+  --dim:#9c7b4a;--acc:#ffb020;--seg-off:#221808;
+  --gauge-fg:#ffcf7d;--gauge-dim:#9c7b4a}
+body[data-theme=retro] #gear,body[data-theme=retro] #gearA{color:#ffcf7d;
+  text-shadow:0 0 calc(var(--u)*1.6) rgba(255,176,32,.45)}
+body[data-theme=minimal]{--bg:#000;--panel:#000;--line:#111;--tx:#ddd;--dim:#555;
+  --acc:#888;--seg-off:#111;--gauge-fg:#ccc;--gauge-dim:#444}
+body[data-theme=neon]{--bg:#0d0221;--panel:#170b33;--line:#3b1a6e;--tx:#f3e9ff;
+  --dim:#8f7bb8;--acc:#ff2bd6;--seg-off:#1d1040;
+  --gauge-fg:#2be2ff;--gauge-dim:#8f7bb8;
   background-image:repeating-linear-gradient(transparent 0 39px,rgba(255,43,214,.07) 39px 40px),
    linear-gradient(#0d0221 60%,#1b0640)}
-body[data-theme=neon] #gear{background:linear-gradient(180deg,#2be2ff,#ff2bd6);
+body[data-theme=neon] #gear,body[data-theme=neon] #gearA{
+  background:linear-gradient(180deg,#2be2ff,#ff2bd6);
   -webkit-background-clip:text;background-clip:text;color:transparent}
 </style></head>
-<body data-theme="pit">
+<body data-theme="pit" data-display="analog">
 <div id="flash"></div>
-<div class="top"><span class="brand">RS50 · __LABEL__</span>
-  <span class="badge off" id="mode">대기</span><span class="dot" id="teldot"></span></div>
+<div class="top">
+  <span class="brand">RS50 · __LABEL__</span>
+  <span class="badge off" id="mode">대기</span><span class="dot" id="teldot"></span>
+  <div class="switchers">
+    <nav class="sw" id="displaysw"></nav>
+    <nav class="sw" id="themes"></nav>
+  </div>
+</div>
 <main id="main"></main>
 <div class="rev" id="rev"></div>
 <script>
 const SIDE='__SIDE__', N=24;
-document.body.dataset.theme=localStorage.getItem('rs50-theme')||'pit';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const THEMES=[['pit','PIT'],['f1','F1'],['retro','RETRO'],['minimal','OLED'],['neon','NEON']];
+const DISPLAYS=[['digital','DIG'],['analog','ANA']];
 
-/* 사이드별 레이아웃 구성 */
+function buildSwitch(navId, items, dataKey, storeKey, defval){
+  const nav=$(navId);
+  items.forEach(([key,label])=>{
+    const b=document.createElement('button');
+    b.textContent=label;b.dataset.v=key;b.onclick=()=>set(key);
+    nav.appendChild(b);
+  });
+  function set(v){
+    document.body.dataset[dataKey]=v;
+    localStorage.setItem(storeKey,v);
+    [...nav.children].forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+  }
+  const stored=localStorage.getItem(storeKey);
+  set(items.some(([k])=>k===stored)?stored:defval);
+}
+buildSwitch('themes',THEMES,'theme','rs50-theme','pit');
+buildSwitch('displaysw',DISPLAYS,'display','rs50-display-'+SIDE,'analog');
+
+/* ===== 레이아웃 ===== */
 if(SIDE==='left'){
   $('main').innerHTML=`
-    <div class="big"><small>GEAR</small><div id="gear">-</div></div>
-    <div class="big"><small>KM/H</small><div id="speed">0</div></div>
-    <div class="sub"><b id="rpm">0</b> / <span id="maxrpm">0</span> RPM
+    <div class="gauge panel ana" id="tachoWrap" style="padding:calc(var(--u)*1)">
+      <svg viewBox="0 0 200 200">
+        <g id="ticks"></g>
+        <path id="redzone" fill="none" stroke="#ff3b3b" stroke-width="6" opacity=".8"/>
+        <line id="needle" class="needle" x1="100" y1="100" x2="100" y2="22"
+              stroke-width="4" stroke-linecap="round"
+              style="transform-origin:100px 100px"/>
+        <circle class="hub" cx="100" cy="100" r="7"/>
+        <text class="gunit" x="100" y="170" text-anchor="middle" font-size="9"
+              letter-spacing="2">% REDLINE</text>
+      </svg>
+      <div id="gearA">-</div>
+    </div>
+    <div class="big ana"><span id="speedA">0</span><span class="sub"> km/h</span></div>
+    <div class="big dig"><small>GEAR</small><div id="gear">-</div></div>
+    <div class="big dig"><small>KM/H</small><div id="speed">0</div></div>
+    <div class="sub dig"><b id="rpm">0</b> / <span id="maxrpm">0</span> RPM
       · <b id="ratio">0</b>%</div>
     <div class="gwrap"><div class="gtrack"><div class="gtick"></div><div id="gdot"></div></div>
       <div class="glabel"><span>-2G</span><span>LAT <b id="gval">0.0</b>G</span><span>+2G</span></div></div>`;
+  /* 타코 눈금 (0..100%, 스윕 -120..+120) */
+  const tg=$('ticks');
+  for(let i=0;i<=10;i++){
+    const a=(-120+i*24)*Math.PI/180, r1=86, r2=i%2?78:72;
+    tg.innerHTML+=`<line class="tick${i>=9?' red':''}"
+      x1="${100+r1*Math.sin(a)}" y1="${100-r1*Math.cos(a)}"
+      x2="${100+r2*Math.sin(a)}" y2="${100-r2*Math.cos(a)}"
+      stroke-width="${i%2?1.5:3}"/>`
+     +(i%2?'':`<text class="tlabel" x="${100+58*Math.sin(a)}"
+        y="${100-58*Math.cos(a)+3}" text-anchor="middle" font-size="10">${i*10}</text>`);
+  }
 }else{
   $('main').innerHTML=`
-    <div class="big"><small>DRIFT ANGLE</small>
+    <div class="gauge panel ana" id="driftGWrap" style="padding:calc(var(--u)*1)">
+      <svg viewBox="0 0 240 150">
+        <g id="dticks"></g>
+        <line id="dghost" class="ghost" x1="120" y1="130" x2="120" y2="34"
+              stroke-width="2" style="transform-origin:120px 130px"/>
+        <line id="dneedle" class="needle" x1="120" y1="130" x2="120" y2="30"
+              stroke-width="4" stroke-linecap="round"
+              style="transform-origin:120px 130px"/>
+        <circle class="hub" cx="120" cy="130" r="7"/>
+        <text class="gunit" x="120" y="147" text-anchor="middle" font-size="9"
+              letter-spacing="2">DRIFT °</text>
+      </svg>
+    </div>
+    <div class="big ana"><span id="darrowA"></span><span id="driftA">0</span><span class="sub">° · PK <b id="dpeakA">-</b></span></div>
+    <div class="big dig"><small>DRIFT ANGLE</small>
       <div><span id="darrow"></span><span id="drift">0</span>°</div>
       <div class="sub">PEAK <b id="dpeak">-</b></div></div>
-    <div class="sub">CLASS <b id="carclass">-</b> · PI <b id="carpi">-</b></div>
-    <div class="events" id="log"></div>`;
+    <div class="sub">CLASS <b id="carclass">-</b> · PI <b id="carpi">-</b>
+      · <b id="rpmR">0</b> RPM</div>
+    <div class="events panel" id="log" style="padding:calc(var(--u)*1)"></div>`;
+  /* 드리프트 다이얼: ±60° -> 화면각 ±75° */
+  const tg=$('dticks');
+  for(let d=-60;d<=60;d+=15){
+    const a=d/60*75*Math.PI/180, r1=96, r2=(d%30===0)?84:90;
+    tg.innerHTML+=`<line class="tick" x1="${120+r1*Math.sin(a)}" y1="${130-r1*Math.cos(a)}"
+      x2="${120+r2*Math.sin(a)}" y2="${130-r2*Math.cos(a)}"
+      stroke-width="${d%30===0?3:1.5}"/>`
+     +(d%30===0?`<text class="tlabel" x="${120+72*Math.sin(a)}"
+        y="${130-72*Math.cos(a)+3}" text-anchor="middle" font-size="10">${Math.abs(d)}</text>`:'');
+  }
 }
 const rev=$('rev');
 for(let i=0;i<N;i++){const d=document.createElement('div');rev.appendChild(d);}
 const segs=[...rev.children];
 
+/* ===== 데이터 엔진 (폴링 + 60fps 보간 + rAF 폴백) ===== */
 let T={ratio:0,alive:false,start_ratio:.5,blink_ratio:.9,seg_colors:null,events:[]};
 let D={ratio:0,rpm:0,speed:0,drift:0,latg:0};
-let lastGear=null,lastEvents='',fails=0,inflight=false,peak=0,peakTs=0;
+let lastGear=null,lastEvents='',fails=0,inflight=false,peak=0,peakTs=0,peakSign=1;
 const CLS=['D','C','B','A','S1','S2','X','X'];
 
 async function poll(){
@@ -496,14 +607,15 @@ async function poll(){
     $('teldot').className='dot'+(T.alive?' on':'');
     if(SIDE==='left'){
       const g=T.gear===0?'R':(T.gear>10?'N':(T.gear||'-'));
-      if(g!==lastGear){const el=$('gear');el.classList.add('pop');
-        setTimeout(()=>el.classList.remove('pop'),140);lastGear=g;}
-      $('gear').textContent=g;
+      if(g!==lastGear){for(const id of ['gear','gearA']){const el=$(id);
+        el.classList.add('pop');setTimeout(()=>el.classList.remove('pop'),140);}
+        lastGear=g;}
+      $('gear').textContent=g;$('gearA').textContent=g;
       $('maxrpm').textContent=Math.round(T.max_rpm);
     }else{
       $('carclass').textContent=CLS[T.car_class]||'-';
       $('carpi').textContent=T.car_pi||'-';
-      const ev=T.events.slice(-9).map(e=>`<div><b>${esc(e[0])}</b> ${esc(e[1])}</div>`)
+      const ev=T.events.slice(-7).map(e=>`<div><b>${esc(e[0])}</b> ${esc(e[1])}</div>`)
         .reverse().join('');
       if(ev!==lastEvents){$('log').innerHTML=ev;lastEvents=ev;}
     }
@@ -524,19 +636,30 @@ function render(ts){
   D.speed+=((T.alive?T.speed_kmh:0)-D.speed)*k;
   D.drift+=((T.alive?T.drift_deg:0)-D.drift)*k;
   D.latg+=((T.alive?T.lat_g:0)-D.latg)*k;
+
   if(SIDE==='left'){
     $('speed').textContent=Math.round(D.speed);
+    $('speedA').textContent=Math.round(D.speed);
     $('rpm').textContent=Math.round(D.rpm);
     $('ratio').textContent=Math.round(D.ratio*100);
     $('gval').textContent=Math.abs(D.latg).toFixed(1);
     $('gdot').style.left=(50+Math.max(-1,Math.min(1,D.latg/2))*46)+'%';
+    $('needle').style.transform=
+      `rotate(${-120+Math.min(1,Math.max(0,D.ratio))*240}deg)`;
   }else{
     const ad=Math.abs(D.drift);
     $('drift').textContent=ad.toFixed(0);
-    $('darrow').textContent=ad<3?'':(D.drift<0?'◀':'▶');
+    $('driftA').textContent=ad.toFixed(0);
+    const ar=ad<3?'':(D.drift<0?'◀':'▶');
+    $('darrow').textContent=ar;$('darrowA').textContent=ar;
     const nowMs=performance.now();
-    if(ad>peak||nowMs-peakTs>5000){peak=ad;peakTs=nowMs;}
-    $('dpeak').textContent=peak>=10?peak.toFixed(0)+'°':'-';
+    if(ad>peak||nowMs-peakTs>5000){peak=ad;peakTs=nowMs;peakSign=D.drift<0?-1:1;}
+    const pk=peak>=10?peak.toFixed(0)+'°':'-';
+    $('dpeak').textContent=pk;$('dpeakA').textContent=pk;
+    const clamp=v=>Math.max(-60,Math.min(60,v));
+    $('dneedle').style.transform=`rotate(${clamp(D.drift)/60*75}deg)`;
+    $('dghost').style.transform=`rotate(${clamp(peak*peakSign)/60*75}deg)`;
+    $('dghost').style.opacity=peak>=10?.55:0;
   }
   /* rev 바 (바깥->중앙) */
   const over=T.alive&&T.ratio>=T.blink_ratio;
