@@ -402,18 +402,27 @@ body{background:var(--bg);color:var(--tx);display:flex;flex-direction:column;
 .sw button.on{color:var(--tx);border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
 .panel{background:var(--panel);border:1px solid var(--line);
   border-radius:calc(var(--u)*1.2)}
-main{flex:1;display:flex;flex-direction:column;justify-content:center;
-     align-items:center;gap:calc(var(--u)*1.6);min-height:0}
+main{flex:1;min-height:0;display:grid;gap:calc(var(--u)*1.2)}
+body[data-side=left] main{grid-template-columns:56% 1fr;
+  grid-template-rows:1fr auto}
+body[data-side=right] main{grid-template-columns:1fr 1fr;
+  grid-template-rows:1fr auto auto}
+.cell{min-height:0;min-width:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:calc(var(--u)*.8)}
+.sq{position:relative;width:100%;height:100%;min-height:0;min-width:0}
+.sq svg,.sq canvas{position:absolute;inset:0;width:100%;height:100%}
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:calc(var(--u)*1);
+  width:100%;height:100%;min-height:0}
 .big{text-align:center}
 .big small{display:block;font-size:calc(var(--u)*1.5);color:var(--dim);
            letter-spacing:4px;margin-bottom:calc(var(--u)*.5)}
-#gear{font-size:calc(var(--u)*26);font-weight:800;line-height:.95;
+#gear{font-size:calc(var(--u)*17);font-weight:800;line-height:.95;
       transition:transform .12s}
 #speed{font-size:calc(var(--u)*16);font-weight:200;line-height:1;
        letter-spacing:calc(var(--u)*-0.4);font-variant-numeric:tabular-nums}
-#speedA{font-size:calc(var(--u)*10);font-weight:200;
+#speedA{font-size:calc(var(--u)*7);font-weight:200;
   letter-spacing:calc(var(--u)*-0.25);font-variant-numeric:tabular-nums}
-#drift{font-size:calc(var(--u)*21);font-weight:800;line-height:1;color:var(--acc);
+#drift{font-size:calc(var(--u)*13);font-weight:800;line-height:1;color:var(--acc);
        font-variant-numeric:tabular-nums}
 #driftA{font-size:calc(var(--u)*6.5);font-weight:800;color:var(--acc);
         font-variant-numeric:tabular-nums}
@@ -430,10 +439,9 @@ main{flex:1;display:flex;flex-direction:column;justify-content:center;
 .ghost{stroke:var(--acc);opacity:.55}
 .hub{fill:var(--gauge-fg)}
 .gunit{fill:var(--gauge-dim)}
-#tachoWrap svg{width:calc(var(--u)*40);height:calc(var(--u)*40)}
-#driftGWrap svg{width:calc(var(--u)*48);height:calc(var(--u)*30)}
+#driftGWrap{aspect-ratio:1.6}
 #gearA{position:absolute;left:50%;top:63%;transform:translate(-50%,-50%);
-  font-size:calc(var(--u)*8);font-weight:800;transition:transform .12s}
+  font-size:calc(var(--u)*5.5);font-weight:800;transition:transform .12s}
 #gearA.pop{transform:translate(-50%,-50%) scale(1.12)!important}
 /* 횡G */
 .gwrap{width:min(82%,calc(var(--u)*54))}
@@ -446,8 +454,7 @@ main{flex:1;display:flex;flex-direction:column;justify-content:center;
 .glabel{display:flex;justify-content:space-between;color:var(--dim);
   font-size:calc(var(--u)*1.2);margin-top:calc(var(--u)*.4)}
 /* 이벤트 */
-.events{width:100%;max-height:calc(var(--u)*18);overflow:hidden;
-  font:calc(var(--u)*1.4)/1.8 Consolas,monospace}
+.events{display:none}
 .events div{color:var(--dim);animation:fadein .4s ease}
 .events div b{color:var(--tx)}
 @keyframes fadein{from{opacity:0;transform:translateY(-4px)}to{opacity:1}}
@@ -459,12 +466,9 @@ body[data-display=analog] .dig{display:none!important}
   flex-wrap:wrap;width:100%}
 canvas.widget{background:var(--panel);border:1px solid var(--line);
   border-radius:calc(var(--u)*1.2)}
-#gg{width:calc(var(--u)*24);height:calc(var(--u)*24)}
-#att{width:calc(var(--u)*26);height:calc(var(--u)*26)}
-#trace{width:min(94%,calc(var(--u)*72));height:calc(var(--u)*12)}
-#map{width:calc(var(--u)*20);height:calc(var(--u)*20)}
-.tires{display:grid;grid-template-columns:1fr 1fr;gap:calc(var(--u)*.8);
-  width:calc(var(--u)*26)}
+#trace{width:100%;height:calc(var(--u)*9)}
+.tires{display:grid;grid-template-columns:1fr 1fr;gap:calc(var(--u)*.7);
+  width:100%;min-height:0}
 .tire{background:var(--panel);border:1px solid var(--line);
   border-radius:calc(var(--u)*.9);padding:calc(var(--u)*.8);
   display:flex;flex-direction:column;gap:calc(var(--u)*.4)}
@@ -482,6 +486,14 @@ canvas.widget{background:var(--panel);border:1px solid var(--line);
      width:min(96%,calc(var(--u)*86));margin:0 auto;flex-direction:__FLEXDIR__}
 .rev div{flex:1;border-radius:calc(var(--u)*1.2);background:var(--seg-off);
   border:1px solid var(--line);transition:background .05s,box-shadow .05s}
+/* 좁은 창(폰/세로) 폴백: 단일 컬럼 스택 + 스크롤 허용 */
+@media (max-width: 900px){
+  body{overflow-y:auto}
+  body[data-side=left] main,body[data-side=right] main{
+    display:flex;flex-direction:column}
+  .sq{height:auto;aspect-ratio:1}
+  .sq svg,.sq canvas{position:static}
+}
 /* 테마 */
 body[data-theme=pit]{--bg:#0b0e14;--panel:#141922;--line:#232b38;--tx:#e6edf3;
   --dim:#8b98a9;--acc:#3b6cff;--gauge-fg:#e6edf3;--gauge-dim:#8b98a9}
@@ -507,7 +519,7 @@ body[data-theme=neon] #gear,body[data-theme=neon] #gearA{
   background:linear-gradient(180deg,#2be2ff,#ff2bd6);
   -webkit-background-clip:text;background-clip:text;color:transparent}
 </style></head>
-<body data-theme="pit" data-display="analog">
+<body data-theme="pit" data-display="analog" data-side="__SIDE__">
 <div id="flash"></div>
 <div class="top">
   <span class="brand">RS50 · __LABEL__</span>
@@ -547,7 +559,8 @@ buildSwitch('displaysw',DISPLAYS,'display','rs50-display-'+SIDE,'analog');
 /* ===== 레이아웃 ===== */
 if(SIDE==='left'){
   $('main').innerHTML=`
-    <div class="gauge panel ana" id="tachoWrap" style="padding:calc(var(--u)*1)">
+    <div class="cell">
+    <div class="gauge panel ana sq" id="tachoWrap" style="padding:calc(var(--u)*1)">
       <svg viewBox="0 0 200 200">
         <g id="ticks"></g>
         <path id="redzone" fill="none" stroke="#ff3b3b" stroke-width="6" opacity=".8"/>
@@ -565,11 +578,14 @@ if(SIDE==='left'){
     <div class="big dig"><small>KM/H</small><div id="speed">0</div></div>
     <div class="sub dig"><b id="rpm">0</b> / <span id="maxrpm">0</span> RPM
       · <b id="ratio">0</b>%</div>
-    <div class="gwrap"><div class="gtrack"><div class="gtick"></div><div id="gdot"></div></div>
-      <div class="glabel"><span>-2G</span><span>LAT <b id="gval">0.0</b>G</span><span>+2G</span></div></div>
-    <div class="wrow">
-      <canvas id="gg" class="widget"></canvas>
+    </div>
+    <div class="cell">
+      <div class="sq"><canvas id="gg" class="widget"></canvas></div>
       <div class="tires" id="tires"></div>
+    </div>
+    <div class="cell" style="grid-column:1/3">
+      <div class="gwrap"><div class="gtrack"><div class="gtick"></div><div id="gdot"></div></div>
+      <div class="glabel"><span>-2G</span><span>LAT <b id="gval">0.0</b>G</span><span>+2G</span></div></div>
     </div>`;
   for(const wn of ['fl','fr','rl','rr']){
     const d=document.createElement('div');d.className='tire';
@@ -591,7 +607,8 @@ if(SIDE==='left'){
   }
 }else{
   $('main').innerHTML=`
-    <div class="gauge panel ana" id="driftGWrap" style="padding:calc(var(--u)*1)">
+    <div class="cell">
+    <div class="gauge panel ana" id="driftGWrap" style="padding:calc(var(--u)*1);width:100%">
       <svg viewBox="0 0 240 150">
         <g id="dticks"></g>
         <line id="dghost" class="ghost" x1="120" y1="130" x2="120" y2="34"
@@ -608,17 +625,24 @@ if(SIDE==='left'){
     <div class="big dig"><small>DRIFT ANGLE</small>
       <div><span id="darrow"></span><span id="drift">0</span>°</div>
       <div class="sub">PEAK <b id="dpeak">-</b></div></div>
-    <div class="wrow">
-      <canvas id="att" class="widget"></canvas>
-      <canvas id="map" class="widget"></canvas>
     </div>
-    <canvas id="trace" class="widget"></canvas>
+    <div class="cell">
+      <div class="duo">
+        <div class="sq"><canvas id="att" class="widget"></canvas></div>
+        <div class="sq"><canvas id="map" class="widget"></canvas></div>
+      </div>
+    </div>
+    <div class="cell" style="grid-column:1/3">
+      <canvas id="trace" class="widget"></canvas>
+    </div>
+    <div class="cell" style="grid-column:1/3">
     <div class="score">
       <span>PK <b id="sPk">0</b>°</span><span>MAX <b id="sG">0.0</b>G</span>
       <span>드리프트 <b id="sHold">0.0</b>s</span>
       <span>CLASS <b id="carclass">-</b>·PI <b id="carpi">-</b></span>
     </div>
-    <div class="events panel" id="log" style="padding:calc(var(--u)*1)"></div>`;
+    </div>
+    <div class="events" id="log"></div>`;
   /* 드리프트 다이얼: ±60° -> 화면각 ±75° */
   const tg=$('dticks');
   for(let d=-60;d<=60;d+=15){
