@@ -77,11 +77,17 @@ def main():
     fsm_cfg = {**cfg.get("auto", {}), **cfg.get("override", {})}
     fsm = AutoShiftFSM(state, shifter, fsm_cfg, log=log)
 
+    monitor_only = "--monitor" in sys.argv
+    if monitor_only:
+        log("[모드] 모니터링 전용 — 패들 관찰/키 인젝션/LED 전부 비활성 (휠 접촉 0)")
+
     watcher = None
     pcfg = cfg.get("paddles", {})
     pkeys = ("byte_up", "bit_up", "byte_down", "bit_down")
     missing = [k for k in pkeys if pcfg.get(k) is None]
-    if not missing:
+    if monitor_only:
+        pass
+    elif not missing:
         try:
             watcher = PaddleWatcher(pcfg["byte_up"], pcfg["bit_up"],
                                     pcfg["byte_down"], pcfg["bit_down"],
@@ -98,7 +104,7 @@ def main():
         log("[경고] [paddles] 미설정 — tools/paddle_map.py 로 실측 후 기입 (AUTO 전용 동작)")
 
     lcfg = cfg.get("led", {})
-    if "--led" in sys.argv:
+    if "--led" in sys.argv and not monitor_only:
         # 주행 중 LED 렌더링은 최종 폐기 (RS50: FFB와 LED가 USB 컨트롤 파이프
         # 공유 — 어떤 전송이든 FFB 붕괴, 실주행 확정. rev 게이지 = 웹 담당).
         # --led는 시작 시 1회만: 데스크톱 프로필 보장 + 정적 F1 그라데이션 표시.
@@ -147,7 +153,8 @@ def main():
     try:
         while True:
             try:
-                fsm.tick()
+                if not monitor_only:
+                    fsm.tick()
             except Exception as e:
                 now = time.time()
                 if now - last_tick_err > 5:

@@ -14,7 +14,7 @@ echo ============================================
 rem open dashboard after 3s (wait for app startup)
 start "" /min cmd /c "timeout /t 3 >nul & start http://127.0.0.1:8777"
 
-python -m src.main --led
+python -m src.main --monitor
 
 echo.
 echo App stopped.
