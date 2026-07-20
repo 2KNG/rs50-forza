@@ -207,7 +207,14 @@ class Rs50Led:
                 self.arm_level()
                 self._path = "level"
                 self._last_frame = None
-            if rpm_ratio >= blink_ratio:
+            if mode == "shift":
+                # 시프트 라이트: 임계 도달 시 풀점등, 히스테리시스로 소등
+                # (기어당 왕복 ~2회 전송 — FFB 컨트롤 파이프 점유 최소화)
+                was_on = self._last_frame == ("lv", 10)
+                on_th = blink_ratio
+                off_th = blink_ratio - 0.08
+                lv = 10 if (rpm_ratio >= on_th or (was_on and rpm_ratio >= off_th)) else 0
+            elif rpm_ratio >= blink_ratio:
                 if blink_hz > 0:
                     lv = 10 if (int(now * blink_hz * 2) % 2) == 0 else 0
                 else:

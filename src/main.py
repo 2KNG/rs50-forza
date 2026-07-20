@@ -62,9 +62,16 @@ class LedThread(threading.Thread):
         self._stop.set()
 
     def run(self):
+        race_leds = self.lcfg.get("race_leds", False)
         while not self._stop.is_set():
             s = self.state
             try:
+                if s.alive and not race_leds:
+                    # 주행 중 LED 완전 침묵 — RS50은 FFB와 LED가 USB 컨트롤
+                    # 파이프를 공유해 어떤 전송이든 FFB를 해침 (실주행 확정).
+                    # rev 게이지는 웹 대시보드가 담당.
+                    time.sleep(0.05)
+                    continue
                 self.led.set_rpm(
                     s.rpm_ratio if s.alive else 0.0,
                     start_ratio=self.lcfg.get("start_ratio", 0.5),
@@ -176,6 +183,8 @@ def main():
                 "blink_ratio": lcfg.get("blink_ratio", 0.95),
                 "blink_hz": lcfg.get("blink_hz", 5),
                 "seg_colors": _seg_colors(lcfg),
+                "lat_g": state.lat_g,
+                "drift_deg": state.drift_deg,
                 "events": list(EVENTS),
             }
         port = wcfg.get("port", 8777)

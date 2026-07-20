@@ -16,6 +16,11 @@ _SLED = {
     "max_rpm":     (8,   "<f"),
     "idle_rpm":    (12,  "<f"),
     "rpm":         (16,  "<f"),
+    "accel_x":     (20,  "<f"),  # 로컬 가로 가속 (우+) — 횡G
+    "accel_z":     (28,  "<f"),  # 로컬 전방 가속
+    "vel_x":       (32,  "<f"),  # 로컬 가로 속도 — 드리프트 각 계산용
+    "vel_z":       (40,  "<f"),  # 로컬 전방 속도
+    "ang_vel_y":   (48,  "<f"),  # 요 레이트
 }
 
 # 패킷 크기별 dash 구간 오프셋
@@ -52,6 +57,11 @@ class TelemetryState:
         self.handbrake = 0
         self.gear = 0
         self.steer = 0
+        self.accel_x = 0.0
+        self.accel_z = 0.0
+        self.vel_x = 0.0
+        self.vel_z = 0.0
+        self.ang_vel_y = 0.0
 
     @property
     def alive(self):
@@ -63,6 +73,22 @@ class TelemetryState:
         if self.max_rpm <= self.idle_rpm:
             return 0.0
         return max(0.0, (self.rpm - self.idle_rpm) / (self.max_rpm - self.idle_rpm))
+
+    @property
+    def lat_g(self):
+        """횡가속도 (G 단위, 우측 +)."""
+        return self.accel_x / 9.81
+
+    @property
+    def drift_deg(self):
+        """드리프트 각(슬립 앵글, 도 단위) — 로컬 속도벡터와 차체 전방의 각.
+
+        저속(5m/s 미만)에선 노이즈라 0 처리. 우측 슬라이드 +.
+        """
+        import math
+        if self.speed < 5.0:
+            return 0.0
+        return math.degrees(math.atan2(self.vel_x, max(0.1, abs(self.vel_z))))
 
 
 class TelemetryListener(threading.Thread):

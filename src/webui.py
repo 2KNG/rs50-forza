@@ -63,6 +63,17 @@ main{display:flex;flex-direction:column;gap:calc(var(--u)*1.2);flex:1;min-height
       font-variant-numeric:tabular-nums;transition:transform .12s}
 .pop{transform:scale(1.14)!important}
 .vnum{font-size:calc(var(--u)*4.4);font-weight:700;font-variant-numeric:tabular-nums}
+/* 드리프트/횡G */
+.driftblk .vnum{color:var(--acc)}
+.driftblk small #dpeak{color:var(--tx);font-weight:700}
+#darrow{font-size:calc(var(--u)*2.6);vertical-align:middle;margin-right:calc(var(--u)*.4)}
+.gblk{min-width:calc(var(--u)*16)}
+.gtrack{position:relative;width:calc(var(--u)*13);height:calc(var(--u)*1.4);
+  background:var(--seg-off);border:1px solid var(--line);border-radius:calc(var(--u)*.7)}
+.gtick{position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--dim);opacity:.6}
+#gdot{position:absolute;top:50%;left:50%;width:calc(var(--u)*1.1);height:calc(var(--u)*1.1);
+  border-radius:50%;background:var(--acc);transform:translate(-50%,-50%);
+  box-shadow:0 0 calc(var(--u)*.8) var(--acc)}
 /* ===== 아날로그 타코 ===== */
 .tacho{position:relative;display:none;padding:calc(var(--u)*.8)}
 .tacho svg{width:calc(var(--u)*32);height:calc(var(--u)*32);display:block}
@@ -184,6 +195,12 @@ body[data-theme=neon] .panel{box-shadow:0 0 calc(var(--u)*2.2) rgba(59,26,110,.3
   </div>
   <div class="panel block gearblk"><small>GEAR</small><div id="gear">-</div></div>
   <div class="panel block"><span class="vnum" id="speed">0</span><small>KM/H</small></div>
+  <div class="panel block driftblk">
+    <span class="vnum"><span id="darrow"></span><span id="drift">0</span>°</span>
+    <small>DRIFT <span id="dpeak"></span></small></div>
+  <div class="panel block gblk">
+    <div class="gtrack"><div class="gtick"></div><div id="gdot"></div></div>
+    <small>LAT G <span id="gval">0.0</span></small></div>
   <div class="panel block rpmnum"><span class="vnum" id="rpm">0</span>
     <small>/ <span id="maxrpm">0</span> RPM</small></div>
 </section>
@@ -250,8 +267,9 @@ drawRedzone(0.95);
 
 /* ===== 서버 폴링(150ms, 목표값) + 60fps 보간 렌더 ===== */
 let T={ratio:0,rpm:0,speed_kmh:0,max_rpm:0,alive:false,gear:null,mode:'AUTO',
-       start_ratio:.5,blink_ratio:.95,blink_hz:5,events:[]};
-let D={ratio:0,rpm:0,speed:0};
+       start_ratio:.5,blink_ratio:.95,blink_hz:5,lat_g:0,drift_deg:0,events:[]};
+let D={ratio:0,rpm:0,speed:0,drift:0,latg:0};
+let driftPeak=0, driftPeakTs=0;
 let lastEvents='', lastGear=null, fails=0, inflight=false, zoneDrawn=false;
 
 async function poll(){
@@ -297,10 +315,23 @@ function render(ts){
   D.ratio+=((T.alive?T.ratio:0)-D.ratio)*k;
   D.rpm  +=((T.alive?T.rpm:0)-D.rpm)*k;
   D.speed+=((T.alive?T.speed_kmh:0)-D.speed)*k;
+  D.drift+=((T.alive?T.drift_deg:0)-D.drift)*k;
+  D.latg +=((T.alive?T.lat_g:0)-D.latg)*k;
 
   $('rpm').textContent=Math.round(D.rpm);
   $('speed').textContent=Math.round(D.speed);
   $('ratio').textContent=Math.round(D.ratio*100)+'%';
+  /* 드리프트 각 + 4초 피크 홀드 */
+  const ad=Math.abs(D.drift);
+  $('drift').textContent=ad.toFixed(0);
+  $('darrow').textContent=ad<3?'':(D.drift<0?'◀':'▶');
+  const nowMs=performance.now();
+  if(ad>driftPeak||nowMs-driftPeakTs>4000){driftPeak=ad;driftPeakTs=nowMs;}
+  $('dpeak').textContent=driftPeak>=10?('PK '+driftPeak.toFixed(0)+'°'):'';
+  /* 횡G: ±2G 스케일 */
+  $('gval').textContent=Math.abs(D.latg).toFixed(1);
+  const gx=Math.max(-1,Math.min(1,D.latg/2));
+  $('gdot').style.left=(50+gx*46)+'%';
   $('needle').style.transform=`rotate(${-120+Math.min(1,Math.max(0,D.ratio))*240}deg)`;
 
   const t=ts/1000, u=upx();

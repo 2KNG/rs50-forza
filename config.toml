@@ -28,12 +28,13 @@ max_gear = 8
 
 [led]                  # 기능 B — python -m src.main --led
 preset = "f1"          # "f1"(초3/빨4/파3, 보라 점멸) | "classic" | "porsche"
-mode = "ltr"           # "ltr"(좌->우 10단계) | "center"(양끝->중앙 5단계)
+mode = "shift"         # "shift"(변속시점만 점등, FFB최소간섭) | "ltr" | "center"
 start_ratio = 0.5      # 이 rpm 비율부터 점등 시작
-blink_ratio = 0.95     # 이 비율부터 전체 점멸 (시프트 신호)
+blink_ratio = 0.88     # shift 모드: 이 비율에서 점등 (업시프트 포인트와 일치)
 blink_hz = 0           # 0 = 오버레브 고정 점등(FFB 보호, 권장) | 양수 = 점멸Hz
 update_hz = 5          # 최대 전송 빈도 (FFB 기아 방지 — 5 권장, 더 낮출수록 안전)
 fast_updates = true    # 3콜 갱신(fn2+commit+refresh). false = 6콜 풀 시퀀스
+race_leds = false      # 주행 중 물리 LED (true = FFB 간섭 감수 — RS50 구조 제약)
 
 [web]                  # 웹 대시보드
 enabled = true
