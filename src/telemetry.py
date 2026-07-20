@@ -107,7 +107,8 @@ class TelemetryState:
     @property
     def alive(self):
         """차량 탑승 중 판정: is_race_on 대신 max_rpm>0 && 최근 수신."""
-        return self.max_rpm > 0 and (time.time() - self.last_rx) < 0.5
+        return (self.is_race_on == 1 and self.max_rpm > 0
+                and (time.time() - self.last_rx) < 0.5)
 
     @property
     def rpm_ratio(self):

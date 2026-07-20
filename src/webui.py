@@ -381,8 +381,8 @@ body{background:var(--bg);color:var(--tx);display:flex;flex-direction:column;
      padding:calc(var(--u)*1.6);padding-bottom:calc(var(--u)*7);
      gap:calc(var(--u)*1.4);overflow:hidden}
 #flash{position:fixed;inset:0;pointer-events:none;z-index:1;opacity:0;
-  box-shadow:inset 0 0 calc(var(--u)*16) calc(var(--u)*3) var(--pur);
-  transition:opacity .06s}
+  box-shadow:inset 0 0 calc(var(--u)*5) calc(var(--u)*.8) var(--pur);
+  transition:opacity .08s}
 .top{display:flex;align-items:center;gap:calc(var(--u)*1);flex-wrap:wrap}
 .brand{font-weight:800;letter-spacing:3px;font-size:calc(var(--u)*1.3);color:var(--dim)}
 .dot{width:calc(var(--u)*.9);height:calc(var(--u)*.9);border-radius:50%;background:#444}
@@ -403,25 +403,23 @@ body{background:var(--bg);color:var(--tx);display:flex;flex-direction:column;
 .panel{background:var(--panel);border:1px solid var(--line);
   border-radius:calc(var(--u)*1.2)}
 main{flex:1;min-height:0;display:grid;gap:calc(var(--u)*1.2)}
-body[data-side=left] main{grid-template-columns:56% 1fr;
-  grid-template-rows:1fr auto}
+body[data-side=left] main{grid-template-columns:1fr 1fr;grid-template-rows:1fr}
 body[data-side=right] main{grid-template-columns:1fr 1fr;
   grid-template-rows:1fr auto auto}
 .cell{min-height:0;min-width:0;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;gap:calc(var(--u)*.8)}
-.sq{position:relative;width:100%;height:100%;min-height:0;min-width:0}
+  align-items:stretch;justify-content:center;gap:calc(var(--u)*.8)}
+.sq{position:relative;flex:1 1 0;width:100%;min-height:0;min-width:0}
 .sq svg,.sq canvas{position:absolute;inset:0;width:100%;height:100%}
 .duo{display:grid;grid-template-columns:1fr 1fr;gap:calc(var(--u)*1);
   width:100%;height:100%;min-height:0}
-.big{text-align:center}
+.big{text-align:center;flex:0 0 auto}
 .big small{display:block;font-size:calc(var(--u)*1.5);color:var(--dim);
            letter-spacing:4px;margin-bottom:calc(var(--u)*.5)}
 #gear{font-size:calc(var(--u)*17);font-weight:800;line-height:.95;
       transition:transform .12s}
 #speed{font-size:calc(var(--u)*16);font-weight:200;line-height:1;
        letter-spacing:calc(var(--u)*-0.4);font-variant-numeric:tabular-nums}
-#speedA{font-size:calc(var(--u)*7);font-weight:200;
-  letter-spacing:calc(var(--u)*-0.25);font-variant-numeric:tabular-nums}
+
 #drift{font-size:calc(var(--u)*13);font-weight:800;line-height:1;color:var(--acc);
        font-variant-numeric:tabular-nums}
 #driftA{font-size:calc(var(--u)*6.5);font-weight:800;color:var(--acc);
@@ -439,12 +437,14 @@ body[data-side=right] main{grid-template-columns:1fr 1fr;
 .ghost{stroke:var(--acc);opacity:.55}
 .hub{fill:var(--gauge-fg)}
 .gunit{fill:var(--gauge-dim)}
-#driftGWrap{aspect-ratio:1.6}
+
+#spdTxt{position:absolute;left:50%;top:63%;transform:translate(-50%,-50%);
+  font-size:calc(var(--u)*4);font-weight:200;font-variant-numeric:tabular-nums}
 #gearA{position:absolute;left:50%;top:63%;transform:translate(-50%,-50%);
   font-size:calc(var(--u)*5.5);font-weight:800;transition:transform .12s}
 #gearA.pop{transform:translate(-50%,-50%) scale(1.12)!important}
 /* 횡G */
-.gwrap{width:min(82%,calc(var(--u)*54))}
+.gwrap{width:min(92%,calc(var(--u)*54));flex:0 0 auto;margin:0 auto}
 .gtrack{position:relative;height:calc(var(--u)*2.2);background:var(--seg-off);
   border:1px solid var(--line);border-radius:calc(var(--u)*1.1)}
 .gtick{position:absolute;left:50%;top:0;bottom:0;width:2px;background:var(--dim);opacity:.5}
@@ -468,7 +468,7 @@ canvas.widget{background:var(--panel);border:1px solid var(--line);
   border-radius:calc(var(--u)*1.2)}
 #trace{width:100%;height:calc(var(--u)*9)}
 .tires{display:grid;grid-template-columns:1fr 1fr;gap:calc(var(--u)*.7);
-  width:100%;min-height:0}
+  width:100%;flex:0 0 auto}
 .tire{background:var(--panel);border:1px solid var(--line);
   border-radius:calc(var(--u)*.9);padding:calc(var(--u)*.8);
   display:flex;flex-direction:column;gap:calc(var(--u)*.4)}
@@ -562,10 +562,21 @@ if(SIDE==='left'){
     <div class="cell">
     <div class="gauge panel ana sq" id="tachoWrap" style="padding:calc(var(--u)*1)">
       <svg viewBox="0 0 200 200">
+        <defs>
+          <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+            <feGaussianBlur stdDeviation="2.6" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <path d="M 22.1 145 A 90 90 0 1 1 177.9 145" fill="none"
+              stroke="var(--seg-off)" stroke-width="9" stroke-linecap="round"/>
+        <path id="tarc" d="M 22.1 145 A 90 90 0 1 1 177.9 145" fill="none"
+              pathLength="100" stroke="var(--acc)" stroke-width="9"
+              stroke-linecap="round" stroke-dasharray="0 100" filter="url(#glow)"/>
         <g id="ticks"></g>
-        <path id="redzone" fill="none" stroke="#ff3b3b" stroke-width="6" opacity=".8"/>
-        <line id="needle" class="needle" x1="100" y1="100" x2="100" y2="22"
-              stroke-width="4" stroke-linecap="round"
+        <path id="redzone" fill="none" stroke="#ff3b3b" stroke-width="4" opacity=".9"/>
+        <line id="needle" class="needle" x1="100" y1="100" x2="100" y2="26"
+              stroke-width="2.5" stroke-linecap="round" filter="url(#glow)"
               style="transform-origin:100px 100px"/>
         <circle class="hub" cx="100" cy="100" r="7"/>
         <text class="gunit" x="100" y="170" text-anchor="middle" font-size="9"
@@ -573,28 +584,38 @@ if(SIDE==='left'){
       </svg>
       <div id="gearA">-</div>
     </div>
-    <div class="big ana"><span id="speedA">0</span><span class="sub"> km/h</span></div>
     <div class="big dig"><small>GEAR</small><div id="gear">-</div></div>
     <div class="big dig"><small>KM/H</small><div id="speed">0</div></div>
     <div class="sub dig"><b id="rpm">0</b> / <span id="maxrpm">0</span> RPM
       · <b id="ratio">0</b>%</div>
     </div>
     <div class="cell">
+      <div class="gauge panel ana sq" id="spdWrap" style="padding:calc(var(--u)*1)">
+        <svg viewBox="0 0 200 200">
+          <defs>
+          <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+            <feGaussianBlur stdDeviation="2.6" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <path d="M 22.1 145 A 90 90 0 1 1 177.9 145" fill="none"
+              stroke="var(--seg-off)" stroke-width="9" stroke-linecap="round"/>
+          <path id="sarc" d="M 22.1 145 A 90 90 0 1 1 177.9 145" fill="none"
+                pathLength="100" stroke="var(--acc)" stroke-width="9"
+                stroke-linecap="round" stroke-dasharray="0 100" filter="url(#glow)"/>
+          <g id="sticks"></g>
+          <line id="sneedle" class="needle" x1="100" y1="100" x2="100" y2="26"
+                stroke-width="2.5" stroke-linecap="round" filter="url(#glow)"
+                style="transform-origin:100px 100px"/>
+          <circle class="hub" cx="100" cy="100" r="7"/>
+          <text class="gunit" x="100" y="170" text-anchor="middle" font-size="9"
+                letter-spacing="2">KM/H</text>
+        </svg>
+        <div id="spdTxt">0</div>
+      </div>
       <div class="sq"><canvas id="gg" class="widget"></canvas></div>
-      <div class="tires" id="tires"></div>
-    </div>
-    <div class="cell" style="grid-column:1/3">
-      <div class="gwrap"><div class="gtrack"><div class="gtick"></div><div id="gdot"></div></div>
-      <div class="glabel"><span>-2G</span><span>LAT <b id="gval">0.0</b>G</span><span>+2G</span></div></div>
     </div>`;
-  for(const wn of ['fl','fr','rl','rr']){
-    const d=document.createElement('div');d.className='tire';
-    d.innerHTML=`<div class="tl"><span>${wn.toUpperCase()}</span><span class="tt" id="tt_${wn}">-</span></div>
-      <div class="tbar"><div id="ts_${wn}"></div></div>
-      <div class="tbar"><div id="tu_${wn}" style="background:var(--dim);opacity:.7"></div></div>`;
-    $('tires').appendChild(d);
-  }
-  /* 타코 눈금 (0..100%, 스윕 -120..+120) */
+  /* 타코 눈금 (0..100%) + 속도계 눈금 (0..300) — 스윕 -120..+120 */
   const tg=$('ticks');
   for(let i=0;i<=10;i++){
     const a=(-120+i*24)*Math.PI/180, r1=86, r2=i%2?78:72;
@@ -605,10 +626,19 @@ if(SIDE==='left'){
      +(i%2?'':`<text class="tlabel" x="${100+58*Math.sin(a)}"
         y="${100-58*Math.cos(a)+3}" text-anchor="middle" font-size="10">${i*10}</text>`);
   }
+  const sg=$('sticks');
+  for(let v=0;v<=300;v+=30){
+    const a=(-120+v/300*240)*Math.PI/180, r1=86, r2=(v%60===0)?72:78;
+    sg.innerHTML+=`<line class="tick" x1="${100+r1*Math.sin(a)}" y1="${100-r1*Math.cos(a)}"
+      x2="${100+r2*Math.sin(a)}" y2="${100-r2*Math.cos(a)}"
+      stroke-width="${v%60===0?3:1.5}"/>`
+     +(v%60===0?`<text class="tlabel" x="${100+58*Math.sin(a)}"
+        y="${100-58*Math.cos(a)+3}" text-anchor="middle" font-size="9">${v}</text>`:'');
+  }
 }else{
   $('main').innerHTML=`
     <div class="cell">
-    <div class="gauge panel ana" id="driftGWrap" style="padding:calc(var(--u)*1);width:100%">
+    <div class="gauge panel ana sq" id="driftGWrap" style="padding:calc(var(--u)*1)">
       <svg viewBox="0 0 240 150">
         <g id="dticks"></g>
         <line id="dghost" class="ghost" x1="120" y1="130" x2="120" y2="34"
@@ -625,15 +655,15 @@ if(SIDE==='left'){
     <div class="big dig"><small>DRIFT ANGLE</small>
       <div><span id="darrow"></span><span id="drift">0</span>°</div>
       <div class="sub">PEAK <b id="dpeak">-</b></div></div>
+    <div class="gwrap"><div class="gtrack"><div class="gtick"></div><div id="gdot"></div></div>
+      <div class="glabel"><span>-2G</span><span>LAT <b id="gval">0.0</b>G</span><span>+2G</span></div></div>
     </div>
     <div class="cell">
-      <div class="duo">
-        <div class="sq"><canvas id="att" class="widget"></canvas></div>
-        <div class="sq"><canvas id="map" class="widget"></canvas></div>
-      </div>
+      <div class="sq"><canvas id="map" class="widget"></canvas></div>
+      <div class="tires" id="tires"></div>
     </div>
     <div class="cell" style="grid-column:1/3">
-      <canvas id="trace" class="widget"></canvas>
+      <canvas id="trace" class="widget" style="flex:0 0 auto"></canvas>
     </div>
     <div class="cell" style="grid-column:1/3">
     <div class="score">
@@ -641,9 +671,14 @@ if(SIDE==='left'){
       <span>드리프트 <b id="sHold">0.0</b>s</span>
       <span>CLASS <b id="carclass">-</b>·PI <b id="carpi">-</b></span>
     </div>
-    </div>
-    <div class="events" id="log"></div>`;
-  /* 드리프트 다이얼: ±60° -> 화면각 ±75° */
+    </div>`;
+  for(const wn of ['fl','fr','rl','rr']){
+    const d=document.createElement('div');d.className='tire';
+    d.innerHTML=`<div class="tl"><span>${wn.toUpperCase()}</span><span class="tt" id="tt_${wn}">-</span></div>
+      <div class="tbar"><div id="ts_${wn}"></div></div>
+      <div class="tbar"><div id="tu_${wn}" style="background:var(--dim);opacity:.7"></div></div>`;
+    $('tires').appendChild(d);
+  }
   const tg=$('dticks');
   for(let d=-60;d<=60;d+=15){
     const a=d/60*75*Math.PI/180, r1=96, r2=(d%30===0)?84:90;
@@ -668,6 +703,11 @@ async function poll(){
   if(inflight)return; inflight=true;
   try{
     T=await (await fetch('/state')).json(); fails=0;
+    const cl=(v,lo,hi)=>isFinite(v)?Math.min(hi,Math.max(lo,v)):0;
+    T.ratio=cl(T.ratio,0,1.5);T.speed_kmh=cl(T.speed_kmh,0,600);
+    T.rpm=cl(T.rpm,0,30000);T.max_rpm=cl(T.max_rpm,0,30000);
+    T.lat_g=cl(T.lat_g,-4,4);T.long_g=cl(T.long_g,-4,4);
+    T.drift_deg=cl(T.drift_deg,-90,90);
     const b=$('mode');
     if(!T.alive){b.textContent='대기';b.className='badge off';}
     else if(T.mode==='AUTO'){b.textContent='AUTO';b.className='badge auto';}
@@ -697,8 +737,13 @@ setInterval(poll,150); poll();
 let lastRender=0,prevTs=null;
 function render(ts){
   lastRender=performance.now();
-  const dt=prevTs===null?1/60:Math.min(0.1,(ts-prevTs)/1000); prevTs=ts;
+  const dt=prevTs===null?1/60:Math.min(0.1,Math.max(0.001,(ts-prevTs)/1000));
+  prevTs=ts;
   const k=1-Math.exp(-dt*9);
+  for(const key in D)if(!isFinite(D[key]))D[key]=0;  // 오염 복구
+  D.speed=Math.min(600,Math.max(0,D.speed));D.ratio=Math.min(1.5,Math.max(0,D.ratio));
+  D.rpm=Math.min(30000,Math.max(0,D.rpm));
+  D.drift=Math.min(90,Math.max(-90,D.drift));D.latg=Math.min(4,Math.max(-4,D.latg));
   D.ratio+=((T.alive?T.ratio:0)-D.ratio)*k;
   D.rpm+=((T.alive?T.rpm:0)-D.rpm)*k;
   D.speed+=((T.alive?T.speed_kmh:0)-D.speed)*k;
@@ -707,13 +752,17 @@ function render(ts){
 
   if(SIDE==='left'){
     $('speed').textContent=Math.round(D.speed);
-    $('speedA').textContent=Math.round(D.speed);
+    $('spdTxt').textContent=Math.round(D.speed);
     $('rpm').textContent=Math.round(D.rpm);
     $('ratio').textContent=Math.round(D.ratio*100);
-    $('gval').textContent=Math.abs(D.latg).toFixed(1);
-    $('gdot').style.left=(50+Math.max(-1,Math.min(1,D.latg/2))*46)+'%';
     $('needle').style.transform=
       `rotate(${-120+Math.min(1,Math.max(0,D.ratio))*240}deg)`;
+    $('sneedle').style.transform=
+      `rotate(${-120+Math.min(1,Math.max(0,D.speed/300))*240}deg)`;
+    $('tarc').setAttribute('stroke-dasharray',
+      `${Math.min(100,Math.max(0,D.ratio*100))} 100`);
+    $('sarc').setAttribute('stroke-dasharray',
+      `${Math.min(100,Math.max(0,D.speed/3))} 100`);
   }else{
     const ad=Math.abs(D.drift);
     $('drift').textContent=ad.toFixed(0);
@@ -728,6 +777,8 @@ function render(ts){
     $('dneedle').style.transform=`rotate(${clamp(D.drift)/60*75}deg)`;
     $('dghost').style.transform=`rotate(${clamp(peak*peakSign)/60*75}deg)`;
     $('dghost').style.opacity=peak>=10?.55:0;
+    $('gval').textContent=Math.abs(D.latg).toFixed(1);
+    $('gdot').style.left=(50+Math.max(-1,Math.min(1,D.latg/2))*46)+'%';
   }
   sampleAndDraw(ts);
   /* rev 바 (바깥->중앙) */
@@ -737,13 +788,13 @@ function render(ts){
   const SC=T.seg_colors&&T.seg_colors.ltr;
   segs.forEach((el,i)=>{
     if(over){const c=(T.seg_colors&&T.seg_colors.blink)||'var(--pur)';
-      el.style.background=c;el.style.boxShadow=`0 0 14px ${c}`;}
+      el.style.background=c;el.style.boxShadow=`0 0 8px ${c}`;}
     else if(T.alive&&i<lit){
       const c=SC?SC[Math.min(9,Math.floor(i*10/N))]:'var(--grn)';
       el.style.background=c;el.style.boxShadow=`0 0 10px ${c}`;}
     else{el.style.background='var(--seg-off)';el.style.boxShadow='none';}
   });
-  $('flash').style.opacity=over?0.8:0;
+  $('flash').style.opacity=over?0.5:0;
 }
 /* ===== 위젯 엔진 ===== */
 const BUF=[];let lastSample=0,maxG=0,holdStart=null,holdBest=0;
@@ -760,7 +811,7 @@ function sampleAndDraw(ts){
   if(now-lastSample>=33){
     lastSample=now;
     BUF.push({t:now,thr:(T.accel||0)/255,brk:(T.brake||0)/255,
-      st:(T.steer||0)/127,hb:(T.handbrake||0)>127,
+      st:(T.steer||0)/127,hb:(T.handbrake||0)/255,
       lg:T.alive?(T.lat_g||0):0,gg:T.alive?(T.long_g||0):0,
       px:T.pos_x||0,pz:T.pos_z||0});
     while(BUF.length&&now-BUF[0].t>20000)BUF.shift();
@@ -770,8 +821,8 @@ function sampleAndDraw(ts){
       holdBest=Math.max(holdBest,(now-holdStart)/1000);}
     else holdStart=null;
   }
-  if(SIDE==='left'){drawGG();drawTires();}
-  else{drawAtt();drawTrace();drawMap();
+  if(SIDE==='left'){drawGG();}
+  else{drawTires();drawTrace();drawMap();
     $('sPk').textContent=peak>=10?peak.toFixed(0):'0';
     $('sG').textContent=maxG.toFixed(1);
     $('sHold').textContent=holdBest.toFixed(1);}
@@ -798,69 +849,44 @@ function drawGG(){
   /* M 스타일: 1G 강조 링 + 크로스헤어 */
   g.strokeStyle=css('--line');g.lineWidth=1;
   for(const gr of [0.5,1.5]){g.beginPath();g.arc(cx,cy,gr*scale,0,7);g.stroke();}
-  g.strokeStyle=css('--dim');g.lineWidth=1.5;
+  g.strokeStyle=css('--dim');g.lineWidth=2.5;
   g.beginPath();g.arc(cx,cy,1*scale,0,7);g.stroke();
+  g.lineWidth=1.8;
   g.beginPath();g.arc(cx,cy,2*scale,0,7);g.stroke();
   g.strokeStyle=css('--line');
   g.beginPath();g.moveTo(cx-R,cy);g.lineTo(cx+R,cy);
   g.moveTo(cx,cy-R);g.lineTo(cx,cy+R);g.stroke();
-  g.fillStyle=css('--dim');g.font='10px Consolas';
-  g.fillText('1',cx+scale-8,cy-4);g.fillText('2',cx+2*scale-10,cy-4);
+  g.fillStyle=css('--dim');g.font='13px Consolas';
+  g.fillText('1G',cx+scale-16,cy-6);g.fillText('2G',cx+2*scale-24,cy-6);
   const now=performance.now(),acc=css('--acc');
-  for(const p of BUF){const age=(now-p.t)/20000;
-    g.globalAlpha=Math.max(0,0.8*(1-age));
-    g.fillStyle=acc;
-    g.beginPath();g.arc(cx+p.lg*scale,cy-p.gg*scale,2.2,0,7);g.fill();}
+  g.lineWidth=3;g.lineCap='round';g.lineJoin='round';g.strokeStyle=acc;
+  for(let i=1;i<BUF.length;i++){
+    const age=(now-BUF[i].t)/20000;
+    g.globalAlpha=Math.max(0,0.85*(1-age));
+    g.beginPath();
+    g.moveTo(cx+BUF[i-1].lg*scale,cy-BUF[i-1].gg*scale);
+    g.lineTo(cx+BUF[i].lg*scale,cy-BUF[i].gg*scale);g.stroke();}
   g.globalAlpha=1;
   const last=BUF[BUF.length-1];
   if(last){
     g.fillStyle=css('--tx');
-    g.beginPath();g.arc(cx+last.lg*scale,cy-last.gg*scale,5,0,7);g.fill();
+    g.beginPath();g.arc(cx+last.lg*scale,cy-last.gg*scale,9,0,7);g.fill();
     /* 중앙 G값 대형 표기 (BMW M 방식) */
     const cur=Math.hypot(last.lg,last.gg);
-    g.font='200 26px Segoe UI';g.textAlign='center';g.fillStyle=css('--tx');
-    g.fillText(cur.toFixed(1),cx,cy-8);
-    g.font='10px Consolas';g.fillStyle=css('--dim');
-    g.fillText('G · PK '+maxG.toFixed(1),cx,cy+8);
+    g.font=`200 ${Math.round(R*0.4)}px Segoe UI`;
+    g.textAlign='center';g.fillStyle=css('--tx');
+    g.fillText(cur.toFixed(1),cx,cy-R*0.02);
+    g.font=`${Math.max(11,Math.round(R*0.11))}px Consolas`;g.fillStyle=css('--dim');
+    g.fillText('G · PK '+maxG.toFixed(1),cx,cy+R*0.16);
     g.textAlign='left';
   }
-}
-
-function drawAtt(){
-  const c=cv('att');if(!c)return;const{g,w,h}=c;
-  g.clearRect(0,0,w,h);
-  const cx=w/2,cy=h/2,R=Math.min(w,h)/2-8;
-  g.strokeStyle=css('--line');g.beginPath();g.arc(cx,cy,R,0,7);g.stroke();
-  g.strokeStyle=css('--dim');g.lineWidth=2;g.setLineDash([4,4]);
-  g.beginPath();g.moveTo(cx,cy+R*0.75);g.lineTo(cx,cy-R*0.75);g.stroke();
-  g.setLineDash([]);
-  g.beginPath();g.moveTo(cx,cy-R*0.8);g.lineTo(cx-6,cy-R*0.62);
-  g.lineTo(cx+6,cy-R*0.62);g.closePath();g.fillStyle=css('--dim');g.fill();
-  g.save();g.translate(cx,cy);g.rotate((D.drift||0)*Math.PI/180);
-  const L=R*1.05,W2=L*0.42;
-  g.fillStyle=css('--acc');g.globalAlpha=0.9;
-  g.beginPath();
-  g.moveTo(0,-L/2);
-  g.quadraticCurveTo(W2/2,-L/2, W2/2,-L/4);g.lineTo(W2/2,L/2-6);
-  g.quadraticCurveTo(W2/2,L/2, W2/4,L/2);g.lineTo(-W2/4,L/2);
-  g.quadraticCurveTo(-W2/2,L/2, -W2/2,L/2-6);g.lineTo(-W2/2,-L/4);
-  g.quadraticCurveTo(-W2/2,-L/2, 0,-L/2);g.fill();
-  g.globalAlpha=1;
-  const sa=(T.steer||0)/127*0.6;
-  for(const sx of [-W2/2+3,W2/2-3]){
-    g.save();g.translate(sx,-L/4);g.rotate(sa);
-    g.fillStyle=css('--tx');g.fillRect(-2.5,-8,5,16);g.restore();}
-  g.restore();
-  g.fillStyle=css('--tx');g.font='bold 16px Segoe UI';g.textAlign='center';
-  g.fillText(Math.abs(D.drift||0).toFixed(0)+String.fromCharCode(176),cx,cy+R-4);
-  g.textAlign='left';
 }
 
 function drawMap(){
   const c=cv('map');if(!c)return;const{g,w,h}=c;
   g.clearRect(0,0,w,h);
   const pts=BUF.filter(p=>p.px||p.pz);
-  g.fillStyle=css('--dim');g.font='10px Consolas';g.fillText('LINE',6,12);
+  g.fillStyle=css('--dim');g.font='10px Consolas';g.fillText('LINE',10,14);
   if(pts.length<2)return;
   let x0=1e12,x1=-1e12,z0=1e12,z1=-1e12;
   for(const p of pts){x0=Math.min(x0,p.px);x1=Math.max(x1,p.px);
@@ -887,12 +913,14 @@ function drawTrace(){
   g.clearRect(0,0,w,h);
   const now=performance.now(),WIN=10000;
   const x=t=>w-(now-t)/WIN*w;
-  g.fillStyle=css('--pur');g.globalAlpha=0.22;
-  let hb0=null;
+  /* 핸드브레이크: 아날로그 채움 영역 (보라) */
+  g.fillStyle=css('--pur');g.globalAlpha=0.3;
+  g.beginPath();let hbStarted=false;
   for(const p of BUF){if(now-p.t>WIN)continue;
-    if(p.hb&&hb0===null)hb0=p.t;
-    if(!p.hb&&hb0!==null){g.fillRect(x(hb0),0,x(p.t)-x(hb0),h);hb0=null;}}
-  if(hb0!==null)g.fillRect(x(hb0),0,w-x(hb0),h);
+    const px=x(p.t),py=h-4-p.hb*(h-8);
+    if(!hbStarted){g.moveTo(px,h);g.lineTo(px,py);hbStarted=true;}
+    else g.lineTo(px,py);}
+  if(hbStarted){g.lineTo(w,h);g.closePath();g.fill();}
   g.globalAlpha=1;
   g.strokeStyle=css('--line');g.beginPath();g.moveTo(0,h/2);g.lineTo(w,h/2);g.stroke();
   const series=[
@@ -907,9 +935,9 @@ function drawTrace(){
       if(!started){g.moveTo(px,py);started=true;}else g.lineTo(px,py);}
     g.stroke();}
   g.fillStyle=css('--dim');g.font='10px Consolas';
-  g.fillText('THR',6,12);g.fillStyle=css('--grn');g.fillRect(32,5,14,3);
-  g.fillStyle=css('--dim');g.fillText('BRK',54,12);g.fillStyle=css('--red');g.fillRect(80,5,14,3);
-  g.fillStyle=css('--dim');g.fillText('STEER',102,12);g.fillStyle=css('--acc');g.fillRect(140,5,14,3);
+  g.fillText('THR',10,14);g.fillStyle=css('--grn');g.fillRect(40,7,14,3);
+  g.fillStyle=css('--dim');g.fillText('BRK',64,14);g.fillStyle=css('--red');g.fillRect(94,7,14,3);
+  g.fillStyle=css('--dim');g.fillText('STEER',118,14);g.fillStyle=css('--acc');g.fillRect(160,7,14,3);
 }
 
 function loop(ts){render(ts);requestAnimationFrame(loop);}
