@@ -529,6 +529,14 @@ body[data-theme=neon]{--bg:#0d0221;--panel:#170b33;--line:#3b1a6e;--tx:#f3e9ff;
 body[data-theme=neon] #gear,body[data-theme=neon] #gearA{
   background:linear-gradient(180deg,#2be2ff,#ff2bd6);
   -webkit-background-clip:text;background-clip:text;color:transparent}
+/* 숫자 폰트 토글 — AA(Segoe)/DIN(Bahnschrift=실차 계기판 표준)/01(Consolas) */
+body[data-numfont=segoe]{--numfont:'Segoe UI',system-ui,sans-serif}
+body[data-numfont=din]{--numfont:Bahnschrift,'Segoe UI',sans-serif}
+body[data-numfont=mono]{--numfont:Consolas,monospace}
+#speed,#gear,#gearA,#spdTxt,#drift,#driftA,#dpeak,#dpeakA,#gval,
+#rpm,#maxrpm,#ratio,.tire .tt,.score b,.sub b,
+#gtTt text,#gtSt text,#gtGear,#gtSpd,#gtTpct,#gtAvg,#gtMax,
+.tlabel{font-family:var(--numfont)}
 /* GT 테마 — 디자인 패널 우승작 (GT7 럭셔리 클러스터) */
 body[data-theme=gt]{--bg:#0a0d13;--panel:#0f141c;--line:#1c2431;--tx:#eef4fa;
   --dim:#5d6b7e;--acc:#2fd6cc;--seg-off:#151b25;
@@ -540,12 +548,13 @@ body[data-theme=gt] .gauge svg.face-std{display:none}
 body[data-theme=gt] #gearA,body[data-theme=gt] #spdTxt{display:none}
 body[data-theme=gt] .panel{border-radius:calc(var(--u)*1.6)}
 </style></head>
-<body data-theme="pit" data-display="analog" data-side="__SIDE__" data-revpos="top" data-revstyle="seg">
+<body data-theme="pit" data-display="analog" data-side="__SIDE__" data-revpos="top" data-revstyle="seg" data-numfont="segoe">
 <div id="flash"></div>
 <div class="top">
   <span class="brand">RS50 · __LABEL__</span>
   <span class="badge off" id="mode">대기</span><span class="dot" id="teldot"></span>
   <div class="switchers">
+    <nav class="sw" id="fontsw"></nav>
     <nav class="sw" id="barsw"></nav>
     <nav class="sw" id="fxsw"></nav>
     <nav class="sw" id="displaysw"></nav>
@@ -586,6 +595,8 @@ buildSwitch('barsw',[['top','BAR\u2009\u25b2'],['both','BAR\u2009\u25b2\u25bc']]
   'revpos','rs50-revpos-'+SIDE,'top','bar');
 buildSwitch('fxsw',[['seg','SEG'],['flame','FIRE']],
   'revstyle','rs50-revstyle-'+SIDE,'seg','fx');
+buildSwitch('fontsw',[['segoe','AA'],['din','DIN'],['mono','01']],
+  'numfont','rs50-numfont-'+SIDE,'segoe','fn');
 
 /* ===== 레이아웃 ===== */
 if(SIDE==='left'){
@@ -961,6 +972,7 @@ function cv(id){const c=$(id);if(!c)return null;
   const g=c.getContext('2d');g.setTransform(c.width/r.width,0,0,c.height/r.height,0,0);
   return {g,w:r.width,h:r.height};}
 function css(v){return getComputedStyle(document.body).getPropertyValue(v).trim();}
+function NF(){return css('--numfont')||"'Segoe UI'";}
 
 function sampleAndDraw(ts){
   const now=performance.now();
@@ -1068,7 +1080,7 @@ function drawGG(){
     g.beginPath();g.arc(cx+D.latg*scale,cy-D.longg*scale,9,0,7);g.fill();
     /* 중앙 G값 대형 표기 (BMW M 방식) — 프레임당 라이브 스무딩값 */
     const cur=Math.hypot(D.latg,D.longg);
-    g.font=`200 ${Math.round(R*0.4)}px Segoe UI`;
+    g.font=`200 ${Math.round(R*0.4)}px ${NF()}`;
     g.textAlign='center';g.fillStyle=css('--tx');
     g.fillText(cur.toFixed(1),cx,cy-R*0.02);
     g.font=`${Math.max(11,Math.round(R*0.11))}px Consolas`;g.fillStyle=css('--dim');

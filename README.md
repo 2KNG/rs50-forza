@@ -1,93 +1,120 @@
-# RS50 × Forza Horizon 6
+# RS50 × Forza Horizon 6 — 드리프트 텔레메트리 대시보드
 
-> **EN TL;DR** — Companion app for the Logitech G RS50 wheel + Forza Horizon 6 (PC):
-> Hyundai/Genesis-style auto↔manual paddle handover (telemetry-driven autoshift via
-> key injection, paddles hand over to manual, auto-resume by timeout/hold), direct
-> RGB rev-strip control over reverse-engineered HID++ (coexists with G HUB), and a
-> zero-dependency web dashboard (5 themes, analog/digital). Windows 10/11,
-> Python 3.11+, `pip install -r requirements.txt`, run `start.bat`. Docs are Korean.
+> **EN TL;DR** — Zero-dependency telemetry dashboard for Forza Horizon (FH4-layout
+> UDP "Data Out") built for a 4K triple-monitor drift setup: `/left` shows driving
+> essentials (GT7-style tacho, analog speedo, G-G meter), `/right` is all drift
+> (drift-angle dial, lat-G bar, tire temps/slip, driving line map, input trace,
+> scoreboard). 6 themes, per-monitor toggles (fonts, flame-style rev bar, dual rev
+> bars), full-channel 60 fps interpolation. Pure Python stdlib server + vanilla JS.
+> Windows 10/11, Python 3.11+. Run `start.bat`. Docs are Korean.
+> The repo also contains the first public protocol-level documentation of the
+> Logitech RS50's HID++ LED/FFB pipeline — see [FFB_DEBUG.md](FFB_DEBUG.md).
 
-Logitech G RS50 휠 + FH6 연동 유틸:
+트리플 모니터(좌/중앙 게임/우)용 **순수 텔레메트리 대시보드**입니다.
+게임 옆 모니터 2장을 실차 계기판으로 만듭니다. 휠/게임에는 아무것도 쓰지 않고
+UDP 수신만 하므로 조작감·FFB에 영향이 0입니다.
 
-- **기능 A — 패들 오토↔매뉴얼 핸드오버**: 평소 텔레메트리 기반 자동 변속(키 인젝션),
-  패들 조작 순간 수동 전환, 7초 무입력 또는 업패들 2초 홀드로 자동 복귀 (현대/제네시스 방식)
-- **기능 B — RPM rev-light**: RS50 스트립(RGB 10개)을 텔레메트리로 직접 렌더링
-  (F1 스타일: 초록→빨강→파랑 채움 + 풀 충전 시 보라 점멸)
-- **웹 대시보드**: http://127.0.0.1:8777 — 기어/속도/RPM 바/모드/이벤트 로그 실시간
-
-## 게임할 때 (평소 루틴)
-
-1. 게임 실행 (Data Out은 한 번 설정해두면 유지됨)
-2. **`start.bat` 더블클릭** — 앱 기동 + 대시보드 자동 오픈, 이게 전부
-3. 끝나면 그 콘솔에서 `Ctrl+C` (LED 정리 후 종료)
-
-조작 요약:
-| 조작 | 동작 |
+| 페이지 | 내용 |
 |---|---|
-| 그냥 주행 | 자동 변속 (0.88 업 / 0.35 다운, 코스팅 포함) |
-| 패들 탭 | 수동 모드 (7초 무입력 시 자동 복귀) |
-| 오른쪽 패들 2초 홀드 | 즉시 자동 복귀 |
-| 왼쪽 패들 2초 홀드 | 후진 진입 (15km/h 이하) |
+| `http://127.0.0.1:8777/left` | 주행 필수: GT7식 타코(% REDLINE + 기어), 아날로그 속도계(AVG/MAX), G-G 미터 |
+| `http://127.0.0.1:8777/right` | 드리프트 전부: 각도 다이얼+피크, 횡G 바, 타이어 온도/슬립/서스 4륜, 주행라인 맵, 입력 트레이스(스로틀/브레이크/조향/핸드브레이크), 스코어보드(피크각·최대G·유지시간·차량 클래스/PI) |
+| `http://127.0.0.1:8777/` | 단일 화면 종합판 |
 
-## 최초 1회 설정
+## 시작하기
 
 ```powershell
+# 최초 1회
 pip install -r requirements.txt
-# 게임: HUD 및 게임플레이 > Data Out ON, IP 127.0.0.1, 포트 5607
-#       변속 = 수동, 키보드 바인딩 시프트업 E / 시프트다운 Q 유지
-python tools\verify.py       # 하드웨어 자가진단 (게임 불필요, --visual: LED 스윕)
+# 게임 설정: HUD 및 게임플레이 > Data Out ON, IP 127.0.0.1, 포트 5607
+
+# 평소: 이거 하나
+start.bat        # 앱 기동 + 양쪽 모니터에 대시보드 자동 배치
 ```
 
-## 아키텍처 핵심 (전부 실기 검증됨 — 이 표가 이 레포의 근거)
+rev 바는 **바깥(모니터 끝) → 중앙(게임)** 방향으로 차오르는 미러 구조라
+게임 화면을 중심으로 좌우가 대칭으로 감쌉니다.
 
-| 항목 | 확정 사실 |
-|---|---|
-| USB | `046d:c276` "RS50 Base for PlayStation/PC" |
-| HID++ 라우팅 | 요청 short `0x10` → usage `0xFF43/0x701`. 응답: 베이스(dev 0xFF)=`0x12`←usage `0x704`, **서브디바이스(0x01/0x02/0x05)=`0x11`←usage `0x702`** |
-| **SW_ID** | **`0x03` 고정. `0x0A~0x0E`는 G HUB 세션과 충돌 → FFB가 꼬여 휠이 제멋대로 회전** |
-| LED 표시 | **표시는 슬롯 0만 렌더링** (슬롯 활성화 명령으로 표시 전환 불가). LED 사이 색은 펌웨어가 그라데이션 보간 |
-| LED 갱신 | fn2 쓰기만으론 저장만 됨. 표시 반영 = fn2 + fn6-commit(`00 01 00 0A 00 0A`) + fn7 (3콜) |
-| FFB 공존 | LED와 FFB 설정이 휠의 명령 처리기 공유 → **상시 전송 금지**. 변화시에만 전송(순항 0콜/s) |
-| G HUB | **살려둘 것** (TrueForce가 G HUB 의존). 슬롯 0 "내용"을 갱신하는 방식이라 충돌 없음 |
-| 패들 | 조이스틱 인터페이스(usage 0x01/0x04) byte 1: bit0=오른쪽(업), bit1=왼쪽(다운). read-only 병렬 관찰 |
-| FH6 텔레메트리 | 324B 고정(FH4 레이아웃): rpm@16, max@8, idle@12, speed@256, gear@319(11=중립), accel@315. 메뉴에선 패킷 정지 |
+## 화면 커스터마이즈 (우상단 스위처, 모니터별로 따로 기억됨)
 
-## 구조
+| 토글 | 옵션 | 설명 |
+|---|---|---|
+| 테마 | PIT · **GT** · F1 · RETRO · OLED · NEON | GT = GT7 럭셔리 클러스터(3계층 눈금, 해치 레드존, GEAR 디스크, AVG/MAX) |
+| 숫자 폰트 | AA · DIN · 01 | DIN = Bahnschrift(실차 계기판 표준 서체), 01 = 모노스페이스 |
+| rev 바 위치 | BAR ▲ · BAR ▲▼ | ▲▼ = 화면 하단에도 rev 바 추가 |
+| rev 바 스타일 | SEG · FIRE | FIRE = 일렁이는 화염 실루엣 (프리셋 그라데이션) |
+| 표시 모드 | DIG · ANA | 디지털 숫자판 ↔ 아날로그 게이지 |
+
+오버레브(변속 시점) 도달 시 전체 스트립이 보라색으로 8Hz 점멸하고
+화면 테두리가 함께 번쩍입니다.
+
+URL 파라미터로도 강제 가능: `/left?th=gt&fn=din&bar=both&fx=flame&dsp=analog`
+(순서대로 테마/폰트/바 위치/바 스타일/표시 모드 — 스크린샷·검증용)
+
+## 왜 부드러운가
+
+- 수신은 150ms 폴링이지만 표시는 **전 채널 지수 스무딩 + 60fps 렌더**입니다.
+  RPM/속도만이 아니라 G값·드리프트각·조향·핸드브레이크·타이어 온도/슬립/서스·
+  맵 좌표까지 전부 보간됩니다.
+- 채널별 반응속도 차등: 조향·페달은 빠릿하게(rate 18), G/좌표는 중간(12),
+  타이어 온도는 묵직하게(4) — 뭉개짐 없이 부드럽기만 합니다.
+- 백그라운드 탭 폴백, NaN/Infinity 새니타이즈, 음수 dt 클램프 포함.
+
+## 설정 (`config.toml`)
+
+| 섹션 | 키 | 의미 |
+|---|---|---|
+| `[telemetry]` | `port` | 게임 Data Out 포트 (기본 5607) |
+| `[web]` | `port`, `host` | 대시보드 주소 (기본 127.0.0.1:8777, 폰 접속은 host="0.0.0.0") |
+| `[led]` | `start_ratio` | rev 바 점등 시작 rpm 비율 (기본 0.5) |
+| `[led]` | `blink_ratio` | 오버레브 점멸 시작 비율 = 권장 변속 시점 (기본 0.88) |
+| `[led]` | `preset` | rev 바 색 프리셋 (`f1` = 초록→빨강→파랑, 보라 점멸) |
+
+## 개발자용
+
+```powershell
+# 본 인스턴스(8777) 옆에서 충돌 없이 개발 인스턴스(8778/UDP 5608) 실행
+$env:RS50_CONFIG="config.dev.toml"; python -m src.main --monitor
+$env:RS50_CONFIG="config.dev.toml"; python tools\demo_telemetry.py 30   # 가짜 드리프트 주행
+
+python tests\test_all.py                                    # 단위 테스트
+# 스크린샷 검증 (실제 사이드 모니터와 동일한 2560x1440 CSS 뷰포트)
+msedge --headless=new --disable-gpu --window-size=2560,1440 `
+  --virtual-time-budget=8000 --screenshot=out.png "http://127.0.0.1:8778/left?th=gt"
+```
 
 ```
-src/hidpp.py        HID++ 2.0 트랜스포트 (라우팅/SW_ID/에러/재시도)
-src/telemetry.py    Data Out UDP 파서 (스레드)
-src/paddle_watch.py 패들 관찰 스레드 (에지 + 홀드 감지)
-src/autoshift.py    AUTO <-> MANUAL_OVERRIDE 상태머신
-src/shifter.py      pydirectinput 키 인젝션
-src/ledctl.py       rev-light 렌더러 (슬롯 0, 3콜 갱신, 프리셋/물결/점멸)
-src/webui.py        웹 대시보드 (stdlib, 의존성 없음)
-src/main.py         조립 + 이벤트 로그
-tests/test_all.py   단위 테스트 18케이스 (python -m unittest tests.test_all)
-tools/verify.py     하드웨어 검증 스위트 (10항목)
-tools/ffb_doctor.py FFB 설정 진단/복구/가이드 (FFB_DEBUG.md 참고)
-tools/recenter.py   센터 캘리브레이션 (우측 쏠림 해결, --set)
-tools/settings_watch.py  설정 변경 실시간 감시 (SW_ID=0 브로드캐스트)
-tools/soak.py       장시간 안정성 소크 테스트
-tools/*.py          실측/진단 도구 (paddle_capture, hidpp_probe, led_* 등)
-refs/               분석용 레퍼런스 클론 (git 미추적)
-slot0_backup.json   슬롯 0 공장 패턴 백업 (초/노/빨 대칭)
+src/main.py         엔트리 (--monitor = 기본 모드, 휠·게임 완전 무접촉)
+src/telemetry.py    Data Out UDP 파서 — 크기로 포맷 자동판별(232/311/324B), 4륜 타이어/좌표 포함
+src/webui.py        대시보드 전체 (stdlib http.server + vanilla JS, 외부 의존성·리소스 0)
+config.toml         본 설정 / config.dev.toml 개발용
+tools/demo_telemetry.py  게임 없이 개발용 합성 드리프트 텔레메트리
+tools/open_dashboards.ps1 모니터 자동 감지 + Edge 앱창 좌우 배치
+tests/test_all.py   단위 테스트
 ```
+
+## 연구 기록 — RS50 하드웨어 제어의 은퇴 (읽을 가치 있음)
+
+이 레포는 원래 ① 패들 오토↔매뉴얼 핸드오버(텔레메트리 오토시프트 + 키 인젝션)와
+② RS50 RGB 스트립 직접 제어(HID++ 역공학)로 시작했고, **둘 다 완성했지만 은퇴**시켰습니다.
+
+- RS50는 FFB와 LED/입력 경로가 USB 파이프를 공유합니다. LED 전송(어떤 빈도든),
+  패들 HID 병렬 읽기, 키보드 인젝션 **모두가 FH6의 FFB/조작감을 오염**시킴을
+  격리 실험으로 확정했습니다 (모니터 전용 모드 = 완전 정상).
+- 그 과정에서 얻은 **RS50 HID++ 프로토콜 전체 지도**(SW_ID 충돌 규칙, LED 슬롯 0
+  전용 표시, 3콜 갱신 시퀀스, 서브디바이스 라우팅, 센터 캘리브레이션)는 세계 최초의
+  공개 기록입니다 → **[FFB_DEBUG.md](FFB_DEBUG.md)**
+- 구현체는 전부 남아 있습니다: `src/hidpp.py` `src/ledctl.py` `src/autoshift.py`
+  `src/paddle_watch.py` `src/shifter.py`, 진단 도구 `tools/verify.py`
+  `tools/ffb_doctor.py` `tools/recenter.py` 등. LED가 FFB와 무관한 다른 휠이나
+  향후 펌웨어에서는 그대로 재사용 가능합니다.
+- 인젝션의 이론적 우회로는 ViGEm 가상 컨트롤러 에뮬레이션(미검증, 미래 과제).
 
 ## 크레딧 & 면책
 
-- HID++/LED/캘리브레이션 프로토콜의 근간은 [mescon/logitech-trueforce-linux-driver](https://github.com/mescon/logitech-trueforce-linux-driver)의
-  프로토콜 스펙 문서이며, 본 레포의 실기 검증으로 교차 확인/보완했습니다. 참고:
+- HID++ 프로토콜 근간: [mescon/logitech-trueforce-linux-driver](https://github.com/mescon/logitech-trueforce-linux-driver)
+  (본 레포 실기 검증으로 교차 확인/보완). 참고:
   [Juice-XIJ/forza_auto_gear](https://github.com/Juice-XIJ/forza_auto_gear),
-  [GinoLin980/Forza-Horizon-realistic-gearbox](https://github.com/GinoLin980/Forza-Horizon-realistic-gearbox),
-  [Mhytee/Trueforce-For-All](https://github.com/Mhytee/Trueforce-For-All)
-- **역공학 기반 비공식 도구입니다.** Logitech/Playground Games와 무관하며, 사용에 따른
-  책임은 사용자에게 있습니다 (MIT LICENSE). 휠 펌웨어에 설정을 쓰는 도구가 포함되어
-  있으니 각 도구의 설명을 읽고 사용하세요.
-
-## 주의/트러블슈팅
-
-- **휠이 제멋대로 돌면**: 다른 프로그램이 SW_ID 0x0A~0x0E로 HID++를 쏘는지 의심 (본 레포는 0x03)
-- LED가 안 바뀌면: G HUB LIGHTSYNC 효과를 아무거나 한 번 토글, 또는 `fast_updates = false`
-- 슬롯 0을 공장 패턴으로 되돌리기: `slot0_backup.json` 참고 (초록2/노랑2/빨강2/노랑2/초록2, b5=2)
-- 오버라이드 타임아웃/시프트 포인트/색상: `config.toml` 주석 참고
+  [GinoLin980/Forza-Horizon-realistic-gearbox](https://github.com/GinoLin980/Forza-Horizon-realistic-gearbox)
+- 역공학 기반 비공식 도구입니다. Logitech/Playground Games와 무관하며 사용 책임은
+  사용자에게 있습니다 (MIT LICENSE). 휠 펌웨어에 쓰는 도구가 일부 포함되어 있으니
+  각 도구의 설명을 읽고 사용하세요.
