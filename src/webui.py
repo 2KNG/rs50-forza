@@ -533,6 +533,23 @@ body[data-theme=neon] #gear,body[data-theme=neon] #gearA{
 body[data-numfont=segoe]{--numfont:'Segoe UI',system-ui,sans-serif}
 body[data-numfont=din]{--numfont:Bahnschrift,'Segoe UI',sans-serif}
 body[data-numfont=mono]{--numfont:Consolas,monospace}
+body[data-numfont=agency]{--numfont:'Agency FB',Bahnschrift,sans-serif}
+body[data-numfont=impact]{--numfont:Impact,'Arial Black',sans-serif}
+body[data-numfont=black]{--numfont:'Segoe UI Black','Arial Black',sans-serif}
+/* 강조 계열은 얇은 두께/음수 자간 보정 */
+body[data-numfont=agency] #speed,body[data-numfont=agency] #spdTxt
+  {font-weight:700;letter-spacing:0}
+body[data-numfont=impact] #speed,body[data-numfont=impact] #spdTxt,
+body[data-numfont=black] #speed,body[data-numfont=black] #spdTxt
+  {font-weight:400;letter-spacing:0}
+/* 기어 변속 이펙트: 이전 기어가 확대되며 페이드아웃 */
+.gear-ghost{position:fixed;pointer-events:none;z-index:6;
+  display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-family:var(--numfont);line-height:1;
+  animation:gearGhost .42s cubic-bezier(.16,.84,.44,1) forwards;
+  text-shadow:0 0 calc(var(--u)*2) currentColor}
+@keyframes gearGhost{from{transform:scale(1);opacity:.9}
+  to{transform:scale(2.1);opacity:0}}
 #speed,#gear,#gearA,#spdTxt,#drift,#driftA,#dpeak,#dpeakA,#gval,
 #rpm,#maxrpm,#ratio,.tire .tt,.score b,.sub b,
 #gtTt text,#gtSt text,#gtGear,#gtSpd,#gtTpct,#gtAvg,#gtMax,
@@ -573,6 +590,20 @@ const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[
 const THEMES=[['pit','PIT'],['gt','GT'],['f1','F1'],['retro','RETRO'],['minimal','OLED'],['neon','NEON']];
 const DISPLAYS=[['digital','DIG'],['analog','ANA']];
 
+function gearFx(el,val){
+  if(!el)return;const r=el.getBoundingClientRect();
+  if(r.width<4||r.height<4)return;      /* 숨겨진 페이스는 스킵 */
+  const gh=document.createElement('div');gh.className='gear-ghost';
+  gh.textContent=val;
+  gh.style.left=r.left+'px';gh.style.top=r.top+'px';
+  gh.style.width=r.width+'px';gh.style.height=r.height+'px';
+  gh.style.fontSize=r.height*.92+'px';
+  const cs=getComputedStyle(el);
+  gh.style.color=(el instanceof SVGElement)?cs.fill:cs.color;
+  document.body.appendChild(gh);
+  setTimeout(()=>gh.remove(),460);
+}
+
 function buildSwitch(navId, items, dataKey, storeKey, defval, qsKey){
   const nav=$(navId);
   items.forEach(([key,label])=>{
@@ -595,7 +626,7 @@ buildSwitch('barsw',[['top','BAR\u2009\u25b2'],['both','BAR\u2009\u25b2\u25bc']]
   'revpos','rs50-revpos-'+SIDE,'top','bar');
 buildSwitch('fxsw',[['seg','SEG'],['flame','FIRE']],
   'revstyle','rs50-revstyle-'+SIDE,'seg','fx');
-buildSwitch('fontsw',[['segoe','AA'],['din','DIN'],['mono','01']],
+buildSwitch('fontsw',[['segoe','AA'],['din','DIN'],['mono','01'],['agency','AGY'],['impact','IMP'],['black','BLK']],
   'numfont','rs50-numfont-'+SIDE,'segoe','fn');
 
 /* ===== 레이아웃 ===== */
@@ -854,8 +885,11 @@ async function poll(){
     $('teldot').className='dot'+(T.alive?' on':'');
     if(SIDE==='left'){
       const g=T.gear===0?'R':(T.gear>10?'N':(T.gear||'-'));
-      if(g!==lastGear){for(const id of ['gear','gearA']){const el=$(id);
-        el.classList.add('pop');setTimeout(()=>el.classList.remove('pop'),140);}
+      if(g!==lastGear){
+        if(lastGear!==null&&lastGear!=='-')
+          for(const id of ['gear','gearA','gtGear'])gearFx($(id),lastGear);
+        for(const id of ['gear','gearA']){const el=$(id);
+          el.classList.add('pop');setTimeout(()=>el.classList.remove('pop'),140);}
         lastGear=g;}
       $('gear').textContent=g;$('gearA').textContent=g;
       $('maxrpm').textContent=Math.round(T.max_rpm);
