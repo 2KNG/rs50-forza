@@ -165,6 +165,9 @@ body[data-theme=neon] #gearA{color:#2be2ff;
 body[data-theme=neon] .led{border-radius:calc(var(--u)*.9);
   box-shadow:inset 0 0 6px rgba(0,0,0,.6)}
 body[data-theme=neon] .panel{box-shadow:0 0 calc(var(--u)*2.2) rgba(59,26,110,.35)}
+body[data-theme=gt]{--bg:#0a0d13;--panel:#0f141c;--line:#1c2431;--tx:#eef4fa;
+  --dim:#5d6b7e;--acc:#2fd6cc;--seg-off:#151b25;
+  background-image:radial-gradient(120% 90% at 50% -10%,#131a26 0,#0a0d13 60%)}
 </style></head>
 <body data-theme="pit" data-display="digital">
 <div id="ambient"></div><div id="flash"></div>
@@ -216,7 +219,7 @@ const N=10;
 let SEG=['var(--grn)','var(--grn)','var(--grn)','var(--red)','var(--red)',
          'var(--red)','var(--red)','var(--blu)','var(--blu)','var(--blu)'];
 let BLINK_COLOR='var(--pur)';
-const THEMES=[['pit','PIT'],['f1','F1'],['retro','RETRO'],['minimal','OLED'],['neon','NEON']];
+const THEMES=[['pit','PIT'],['gt','GT'],['f1','F1'],['retro','RETRO'],['minimal','OLED'],['neon','NEON']];
 const DISPLAYS=[['digital','DIGITAL'],['analog','ANALOG']];
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
@@ -481,9 +484,17 @@ canvas.widget{background:var(--panel);border:1px solid var(--line);
 .score{display:flex;gap:calc(var(--u)*2.2);font-size:calc(var(--u)*1.5);
   color:var(--dim);font-variant-numeric:tabular-nums;align-items:baseline}
 .score b{color:var(--acc);font-size:calc(var(--u)*2.2)}
-/* rev 바: 바깥(모니터 끝) -> 중앙(게임) */
-.rev{display:flex;gap:calc(var(--u)*.9);height:calc(var(--u)*2.4);
+/* rev 바: 바깥(모니터 끝) -> 중앙(게임) — 상/하단 존 + SEG/불꽃 스타일 */
+.revzone{position:relative;flex:0 0 auto;height:calc(var(--u)*2.4)}
+body[data-revstyle=flame] .revzone{height:calc(var(--u)*3.4)}
+body[data-revpos=top] #revBot{display:none}
+.rev{display:flex;gap:calc(var(--u)*.9);height:100%;
      width:min(96%,calc(var(--u)*86));margin:0 auto;flex-direction:__FLEXDIR__}
+.flamec{position:absolute;top:0;bottom:0;left:50%;transform:translateX(-50%);
+  width:min(96%,calc(var(--u)*86));height:100%}
+body[data-side=right] .flamec{transform:translateX(-50%) scaleX(-1)}
+body[data-revstyle=seg] .flamec{display:none}
+body[data-revstyle=flame] .rev{visibility:hidden}
 .rev div{flex:1;border-radius:calc(var(--u)*1.2);background:var(--seg-off);
   border:1px solid var(--line);transition:background .05s,box-shadow .05s}
 /* 좁은 창(폰/세로) 폴백: 단일 컬럼 스택 + 스크롤 허용 */
@@ -518,50 +529,70 @@ body[data-theme=neon]{--bg:#0d0221;--panel:#170b33;--line:#3b1a6e;--tx:#f3e9ff;
 body[data-theme=neon] #gear,body[data-theme=neon] #gearA{
   background:linear-gradient(180deg,#2be2ff,#ff2bd6);
   -webkit-background-clip:text;background-clip:text;color:transparent}
+/* GT 테마 — 디자인 패널 우승작 (GT7 럭셔리 클러스터) */
+body[data-theme=gt]{--bg:#0a0d13;--panel:#0f141c;--line:#1c2431;--tx:#eef4fa;
+  --dim:#5d6b7e;--acc:#2fd6cc;--seg-off:#151b25;
+  --gauge-fg:#dfe7f0;--gauge-dim:#4a5769;
+  background-image:radial-gradient(120% 90% at 50% -10%,#131a26 0,#0a0d13 60%)}
+.gauge svg.face-gt{display:none}
+body[data-theme=gt] .gauge svg.face-gt{display:block}
+body[data-theme=gt] .gauge svg.face-std{display:none}
+body[data-theme=gt] #gearA,body[data-theme=gt] #spdTxt{display:none}
+body[data-theme=gt] .panel{border-radius:calc(var(--u)*1.6)}
 </style></head>
-<body data-theme="pit" data-display="analog" data-side="__SIDE__">
+<body data-theme="pit" data-display="analog" data-side="__SIDE__" data-revpos="top" data-revstyle="seg">
 <div id="flash"></div>
 <div class="top">
   <span class="brand">RS50 · __LABEL__</span>
   <span class="badge off" id="mode">대기</span><span class="dot" id="teldot"></span>
   <div class="switchers">
+    <nav class="sw" id="barsw"></nav>
+    <nav class="sw" id="fxsw"></nav>
     <nav class="sw" id="displaysw"></nav>
     <nav class="sw" id="themes"></nav>
   </div>
 </div>
-<div class="rev" id="rev"></div>
+<div class="revzone" id="revTop"><div class="rev" id="rev"></div>
+  <canvas class="flamec" id="flameTop"></canvas></div>
 <main id="main"></main>
+<div class="revzone" id="revBot"><div class="rev" id="revB"></div>
+  <canvas class="flamec" id="flameBot"></canvas></div>
 <script>
 const SIDE='__SIDE__', N=12;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-const THEMES=[['pit','PIT'],['f1','F1'],['retro','RETRO'],['minimal','OLED'],['neon','NEON']];
+const THEMES=[['pit','PIT'],['gt','GT'],['f1','F1'],['retro','RETRO'],['minimal','OLED'],['neon','NEON']];
 const DISPLAYS=[['digital','DIG'],['analog','ANA']];
 
-function buildSwitch(navId, items, dataKey, storeKey, defval){
+function buildSwitch(navId, items, dataKey, storeKey, defval, qsKey){
   const nav=$(navId);
   items.forEach(([key,label])=>{
     const b=document.createElement('button');
-    b.textContent=label;b.dataset.v=key;b.onclick=()=>set(key);
+    b.textContent=label;b.dataset.v=key;b.onclick=()=>set(key,true);
     nav.appendChild(b);
   });
-  function set(v){
+  function set(v,persist){
     document.body.dataset[dataKey]=v;
-    localStorage.setItem(storeKey,v);
+    if(persist)localStorage.setItem(storeKey,v);
     [...nav.children].forEach(b=>b.classList.toggle('on',b.dataset.v===v));
   }
-  const stored=localStorage.getItem(storeKey);
-  set(items.some(([k])=>k===stored)?stored:defval);
+  const q=new URLSearchParams(location.search).get(qsKey);
+  const pick=[q,localStorage.getItem(storeKey)].find(x=>items.some(([k])=>k===x));
+  set(pick||defval,false);
 }
-buildSwitch('themes',THEMES,'theme','rs50-theme','pit');
-buildSwitch('displaysw',DISPLAYS,'display','rs50-display-'+SIDE,'analog');
+buildSwitch('themes',THEMES,'theme','rs50-theme','pit','th');
+buildSwitch('displaysw',DISPLAYS,'display','rs50-display-'+SIDE,'analog','dsp');
+buildSwitch('barsw',[['top','BAR\u2009\u25b2'],['both','BAR\u2009\u25b2\u25bc']],
+  'revpos','rs50-revpos-'+SIDE,'top','bar');
+buildSwitch('fxsw',[['seg','SEG'],['flame','FIRE']],
+  'revstyle','rs50-revstyle-'+SIDE,'seg','fx');
 
 /* ===== 레이아웃 ===== */
 if(SIDE==='left'){
   $('main').innerHTML=`
     <div class="cell">
     <div class="gauge panel ana sq" id="tachoWrap" style="padding:calc(var(--u)*1)">
-      <svg viewBox="0 0 200 200">
+      <svg class="face-std" viewBox="0 0 200 200">
         <defs>
           <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
             <feGaussianBlur stdDeviation="2.6" result="b"/>
@@ -582,6 +613,46 @@ if(SIDE==='left'){
         <text class="gunit" x="100" y="170" text-anchor="middle" font-size="9"
               letter-spacing="2">% REDLINE</text>
       </svg>
+      <svg class="face-gt" viewBox="0 0 1000 1000">
+        <defs>
+          <filter id="gtglow" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="7" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <pattern id="gthatch" patternUnits="userSpaceOnUse" width="12" height="12"
+                   patternTransform="rotate(45)">
+            <line x1="0" y1="0" x2="0" y2="12" stroke="#ffffff"
+                  stroke-width="4" opacity="0.28"/>
+          </pattern>
+        </defs>
+        <text x="40" y="985" font-size="22" letter-spacing="6" fill="var(--dim)">&#8212; TACHO</text>
+        <text x="960" y="985" font-size="22" letter-spacing="6" fill="var(--dim)" text-anchor="end">CLUSTER &#183; __LABEL__</text>
+        <path d="M 93 735 A 470 470 0 1 1 907 735" fill="none"
+              stroke="var(--seg-off)" stroke-width="12" stroke-linecap="round"/>
+        <path id="gtTarc" d="M 93 735 A 470 470 0 1 1 907 735" fill="none"
+              pathLength="100" stroke="var(--acc)" stroke-width="12"
+              stroke-linecap="round" stroke-dasharray="0 100" filter="url(#gtglow)"/>
+        <path d="M 929.9 360.4 A 452 452 0 0 1 949.6 547.3" fill="none"
+              stroke="var(--amb)" stroke-width="16" opacity=".9"/>
+        <path d="M 949.6 547.3 A 452 452 0 0 1 891.4 726" fill="none"
+              stroke="var(--red)" stroke-width="16"/>
+        <path d="M 949.6 547.3 A 452 452 0 0 1 891.4 726" fill="none"
+              stroke="url(#gthatch)" stroke-width="16"/>
+        <g id="gtTt"></g>
+        <circle cx="500" cy="500" r="195" fill="var(--panel)"
+                stroke="var(--line)" stroke-width="2"/>
+        <circle cx="500" cy="500" r="150" fill="none" stroke="var(--line)"
+                stroke-width="1" opacity=".5"/>
+        <g id="gtTng" style="transform-origin:500px 500px">
+          <polygon points="492,305 508,305 502.5,85 497.5,85" fill="var(--red)"/>
+          <line x1="500" y1="295" x2="500" y2="95" stroke="var(--tx)"
+                stroke-width="2" opacity=".85"/>
+        </g>
+        <text x="500" y="430" font-size="26" letter-spacing="10" fill="var(--dim)" text-anchor="middle">GEAR</text>
+        <text id="gtGear" x="500" y="648" font-size="230" font-weight="250" fill="var(--tx)" text-anchor="middle">-</text>
+        <text id="gtTpct" x="500" y="890" font-size="88" font-weight="300" fill="var(--tx)" text-anchor="middle">0</text>
+        <text x="500" y="945" font-size="26" letter-spacing="8" fill="var(--dim)" text-anchor="middle">% REDLINE</text>
+      </svg>
       <div id="gearA">-</div>
     </div>
     <div class="big dig"><small>GEAR</small><div id="gear">-</div></div>
@@ -591,7 +662,7 @@ if(SIDE==='left'){
     </div>
     <div class="cell">
       <div class="gauge panel ana sq" id="spdWrap" style="padding:calc(var(--u)*1)">
-        <svg viewBox="0 0 200 200">
+        <svg class="face-std" viewBox="0 0 200 200">
           <defs>
           <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
             <feGaussianBlur stdDeviation="2.6" result="b"/>
@@ -610,6 +681,26 @@ if(SIDE==='left'){
           <circle class="hub" cx="100" cy="100" r="7"/>
           <text class="gunit" x="100" y="170" text-anchor="middle" font-size="9"
                 letter-spacing="2">KM/H</text>
+        </svg>
+        <svg class="face-gt" viewBox="0 0 1000 1000">
+          <path d="M 93 735 A 470 470 0 1 1 907 735" fill="none"
+                stroke="var(--seg-off)" stroke-width="12" stroke-linecap="round"/>
+          <path id="gtSarc" d="M 93 735 A 470 470 0 1 1 907 735" fill="none"
+                pathLength="100" stroke="var(--acc)" stroke-width="12"
+                stroke-linecap="round" stroke-dasharray="0 100" filter="url(#gtglow)"/>
+          <g id="gtSt"></g>
+          <g id="gtSng" style="transform-origin:500px 500px">
+            <polygon points="493,470 507,470 502.5,122 497.5,122" fill="var(--red)"/>
+          </g>
+          <circle cx="500" cy="500" r="42" fill="var(--panel)"
+                  stroke="var(--line)" stroke-width="2"/>
+          <circle cx="500" cy="500" r="14" fill="var(--gauge-fg)"/>
+          <text id="gtSpd" x="500" y="680" font-size="150" font-weight="250" fill="var(--tx)" text-anchor="middle">0</text>
+          <text x="500" y="730" font-size="28" letter-spacing="8" fill="var(--dim)" text-anchor="middle">KM/H</text>
+          <text x="60" y="880" font-size="24" letter-spacing="6" fill="var(--dim)">AVG</text>
+          <text id="gtAvg" x="60" y="936" font-size="52" font-weight="300" fill="var(--tx)">-</text>
+          <text x="940" y="880" font-size="24" letter-spacing="6" fill="var(--dim)" text-anchor="end">MAX</text>
+          <text id="gtMax" x="940" y="936" font-size="52" font-weight="300" fill="var(--tx)" text-anchor="end">-</text>
         </svg>
         <div id="spdTxt">0</div>
       </div>
@@ -635,6 +726,35 @@ if(SIDE==='left'){
      +(v%60===0?`<text class="tlabel" x="${100+58*Math.sin(a)}"
         y="${100-58*Math.cos(a)+3}" text-anchor="middle" font-size="9">${v}</text>`:'');
   }
+  /* GT 페이스 눈금: 3계층 (주/보조/미세) + 부유 숫자 */
+  let gtm='';
+  for(let v=0;v<=100;v++){
+    const a=(-120+v*2.4)*Math.PI/180,si=Math.sin(a),co=Math.cos(a);
+    let r1,r2,w0,op;
+    if(v%10===0){r1=470;r2=436;w0=5;op=1;}
+    else if(v%5===0){r1=468;r2=448;w0=2.5;op=.8;}
+    else{r1=464;r2=454;w0=1.2;op=.35;}
+    const rd=v>=90;
+    gtm+=`<line x1="${500+r1*si}" y1="${500-r1*co}" x2="${500+r2*si}" y2="${500-r2*co}"
+      stroke="${rd?'var(--red)':'var(--gauge-dim)'}" stroke-width="${w0}" opacity="${op}"/>`;
+    if(v%10===0)gtm+=`<text x="${500+385*si}" y="${500-385*co+16}" font-size="46"
+      font-weight="300" text-anchor="middle"
+      fill="${rd?'var(--red)':'var(--gauge-fg)'}">${v}</text>`;
+  }
+  $('gtTt').innerHTML=gtm;
+  let gts='';
+  for(let v=0;v<=300;v+=5){
+    const a=(-120+v*0.8)*Math.PI/180,si=Math.sin(a),co=Math.cos(a);
+    let r1,r2,w0,op;
+    if(v%50===0){r1=470;r2=436;w0=5;op=1;}
+    else if(v%25===0){r1=468;r2=448;w0=2.5;op=.8;}
+    else{r1=464;r2=454;w0=1.2;op=.35;}
+    gts+=`<line x1="${500+r1*si}" y1="${500-r1*co}" x2="${500+r2*si}" y2="${500-r2*co}"
+      stroke="var(--gauge-dim)" stroke-width="${w0}" opacity="${op}"/>`;
+    if(v%50===0)gts+=`<text x="${500+385*si}" y="${500-385*co+16}" font-size="42"
+      font-weight="300" text-anchor="middle" fill="var(--gauge-fg)">${v}</text>`;
+  }
+  $('gtSt').innerHTML=gts;
 }else{
   $('main').innerHTML=`
     <div class="cell">
@@ -689,13 +809,21 @@ if(SIDE==='left'){
         y="${130-72*Math.cos(a)+3}" text-anchor="middle" font-size="10">${Math.abs(d)}</text>`:'');
   }
 }
-const rev=$('rev');
-for(let i=0;i<N;i++){const d=document.createElement('div');rev.appendChild(d);}
-const segs=[...rev.children];
+const rev=$('rev'),revB=$('revB');
+for(const cont of [rev,revB])
+  for(let i=0;i<N;i++){cont.appendChild(document.createElement('div'));}
+const segs=[...rev.children,...revB.children];
 
 /* ===== 데이터 엔진 (폴링 + 60fps 보간 + rAF 폴백) ===== */
 let T={ratio:0,alive:false,start_ratio:.5,blink_ratio:.9,seg_colors:null,events:[]};
-let D={ratio:0,rpm:0,speed:0,drift:0,latg:0};
+let D={ratio:0,rpm:0,speed:0,drift:0,latg:0,longg:0};
+/* 일반화 지수 스무더 — 채널별 반응속도(rate/s) 차등, NaN 방어 */
+const SM={};
+function sm(key,target,rate,dt){
+  if(!isFinite(target))target=0;
+  const v=isFinite(SM[key])?SM[key]:target;
+  return SM[key]=v+(target-v)*(1-Math.exp(-dt*rate));
+}
 let lastGear=null,lastEvents='',fails=0,inflight=false,peak=0,peakTs=0,peakSign=1;
 const CLS=['D','C','B','A','S1','S2','X','X'];
 
@@ -723,9 +851,6 @@ async function poll(){
     }else{
       $('carclass').textContent=CLS[T.car_class]||'-';
       $('carpi').textContent=T.car_pi||'-';
-      const ev=T.events.slice(-7).map(e=>`<div><b>${esc(e[0])}</b> ${esc(e[1])}</div>`)
-        .reverse().join('');
-      if(ev!==lastEvents){$('log').innerHTML=ev;lastEvents=ev;}
     }
   }catch(e){
     if(++fails>=3){T.alive=false;
@@ -734,7 +859,7 @@ async function poll(){
 }
 setInterval(poll,150); poll();
 
-let lastRender=0,prevTs=null;
+let lastRender=0,prevTs=null,spdSum=0,spdT=0,spdMax=0;
 function render(ts){
   lastRender=performance.now();
   const dt=prevTs===null?1/60:Math.min(0.1,Math.max(0.001,(ts-prevTs)/1000));
@@ -744,11 +869,21 @@ function render(ts){
   D.speed=Math.min(600,Math.max(0,D.speed));D.ratio=Math.min(1.5,Math.max(0,D.ratio));
   D.rpm=Math.min(30000,Math.max(0,D.rpm));
   D.drift=Math.min(90,Math.max(-90,D.drift));D.latg=Math.min(4,Math.max(-4,D.latg));
+  D.longg=Math.min(4,Math.max(-4,D.longg));
   D.ratio+=((T.alive?T.ratio:0)-D.ratio)*k;
   D.rpm+=((T.alive?T.rpm:0)-D.rpm)*k;
   D.speed+=((T.alive?T.speed_kmh:0)-D.speed)*k;
   D.drift+=((T.alive?T.drift_deg:0)-D.drift)*k;
   D.latg+=((T.alive?T.lat_g:0)-D.latg)*k;
+  D.longg+=((T.alive?T.long_g:0)-D.longg)*k;
+  /* 입력/타이어/좌표 — 150ms 틱 -> 프레임 보간 (빠른 채널일수록 rate 높게) */
+  sm('thr',(T.accel||0)/255,18,dt);sm('brk',(T.brake||0)/255,18,dt);
+  sm('st',(T.steer||0)/127,18,dt);sm('hb',(T.handbrake||0)/255,18,dt);
+  sm('px',T.pos_x||0,12,dt);sm('pz',T.pos_z||0,12,dt);
+  const WH=T.wheels||{};
+  for(const wn of ['fl','fr','rl','rr']){const d=WH[wn]||{};
+    sm('t_'+wn,d.temp_c||0,4,dt);sm('c_'+wn,d.combined||0,10,dt);
+    sm('u_'+wn,d.sus||0,14,dt);}
 
   if(SIDE==='left'){
     $('speed').textContent=Math.round(D.speed);
@@ -763,6 +898,19 @@ function render(ts){
       `${Math.min(100,Math.max(0,D.ratio*100))} 100`);
     $('sarc').setAttribute('stroke-dasharray',
       `${Math.min(100,Math.max(0,D.speed/3))} 100`);
+    /* GT 페이스 */
+    const rr=Math.min(1,Math.max(0,D.ratio)),sv=Math.min(300,D.speed);
+    $('gtTarc').setAttribute('stroke-dasharray',`${rr*100} 100`);
+    $('gtTng').style.transform=`rotate(${-120+rr*240}deg)`;
+    $('gtTpct').textContent=Math.round(D.ratio*100);
+    $('gtGear').textContent=$('gear').textContent;
+    $('gtSarc').setAttribute('stroke-dasharray',`${sv/3} 100`);
+    $('gtSng').style.transform=`rotate(${-120+sv/300*240}deg)`;
+    $('gtSpd').textContent=Math.round(D.speed);
+    if(T.alive&&D.speed>1){spdSum+=D.speed*dt;spdT+=dt;
+      spdMax=Math.max(spdMax,D.speed);}
+    $('gtAvg').textContent=spdT>3?Math.round(spdSum/spdT):'-';
+    $('gtMax').textContent=spdMax>1?Math.round(spdMax):'-';
   }else{
     const ad=Math.abs(D.drift);
     $('drift').textContent=ad.toFixed(0);
@@ -783,18 +931,26 @@ function render(ts){
   sampleAndDraw(ts);
   /* rev 바 (바깥->중앙) */
   const over=T.alive&&T.ratio>=T.blink_ratio;
+  /* 오버레브: 실차식 풀스트립 고속 점멸 (웹은 FFB 제약 없음 — 화끈하게) */
+  const blinkOn=over&&Math.floor(ts/1000*2*(T.blink_hz||8))%2===0;
   const lit=D.ratio<=T.start_ratio?0:
     Math.min(N,Math.max(1,Math.round((D.ratio-T.start_ratio)/(T.blink_ratio-T.start_ratio)*N)));
   const SC=T.seg_colors&&T.seg_colors.ltr;
   segs.forEach((el,i)=>{
     if(over){const c=(T.seg_colors&&T.seg_colors.blink)||'var(--pur)';
-      el.style.background=c;el.style.boxShadow=`0 0 8px ${c}`;}
+      if(blinkOn){el.style.background=c;
+        el.style.boxShadow=`0 0 14px ${c},0 0 34px ${c}`;}
+      else{el.style.background='var(--seg-off)';el.style.boxShadow='none';}}
     else if(T.alive&&i<lit){
       const c=SC?SC[Math.min(9,Math.floor(i*10/N))]:'var(--grn)';
       el.style.background=c;el.style.boxShadow=`0 0 10px ${c}`;}
     else{el.style.background='var(--seg-off)';el.style.boxShadow='none';}
   });
-  $('flash').style.opacity=over?0.5:0;
+  $('flash').style.opacity=blinkOn?0.65:0;
+  if(document.body.dataset.revstyle==='flame'){
+    drawFlame('flameTop',ts);
+    if(document.body.dataset.revpos==='both')drawFlame('flameBot',ts);
+  }
 }
 /* ===== 위젯 엔진 ===== */
 const BUF=[];let lastSample=0,maxG=0,holdStart=null,holdBest=0;
@@ -808,12 +964,12 @@ function css(v){return getComputedStyle(document.body).getPropertyValue(v).trim(
 
 function sampleAndDraw(ts){
   const now=performance.now();
-  if(now-lastSample>=33){
+  if(now-lastSample>=16){
     lastSample=now;
-    BUF.push({t:now,thr:(T.accel||0)/255,brk:(T.brake||0)/255,
-      st:(T.steer||0)/127,hb:(T.handbrake||0)/255,
-      lg:T.alive?(T.lat_g||0):0,gg:T.alive?(T.long_g||0):0,
-      px:T.pos_x||0,pz:T.pos_z||0});
+    BUF.push({t:now,thr:SM.thr||0,brk:SM.brk||0,
+      st:SM.st||0,hb:SM.hb||0,
+      lg:D.latg,gg:D.longg,
+      px:SM.px||0,pz:SM.pz||0});
     while(BUF.length&&now-BUF[0].t>20000)BUF.shift();
     const ad=Math.abs(T.alive?T.drift_deg:0);
     if(T.alive&&Math.abs(T.lat_g||0)>maxG)maxG=Math.abs(T.lat_g);
@@ -828,17 +984,57 @@ function sampleAndDraw(ts){
     $('sHold').textContent=holdBest.toFixed(1);}
 }
 
+function drawFlame(id,ts){
+  const c=cv(id);if(!c)return;const{g,w,h}=c;
+  g.clearRect(0,0,w,h);
+  if(!T.alive||!w)return;
+  const over=T.ratio>=T.blink_ratio;
+  const blinkOn=over&&Math.floor(ts/1000*2*(T.blink_hz||8))%2===0;
+  if(over&&!blinkOn)return;              /* 점멸 OFF 위상 */
+  const frac=over?1:Math.min(1,Math.max(0,
+    (D.ratio-T.start_ratio)/(T.blink_ratio-T.start_ratio)));
+  if(frac<=0.005)return;
+  const wl=w*frac,t=ts/1000;
+  const SC=(T.seg_colors&&T.seg_colors.ltr)||['#2bd45f','#ffb020','#ff3b3b'];
+  const blinkC=(T.seg_colors&&T.seg_colors.blink)||'#b93bff';
+  const grad=g.createLinearGradient(0,0,w,0);
+  if(over){grad.addColorStop(0,blinkC);grad.addColorStop(.6,'#ffffff');
+    grad.addColorStop(1,blinkC);}
+  else SC.forEach((cc,i)=>grad.addColorStop(i/(SC.length-1),cc));
+  /* 불꽃 실루엣: 3중 사인 일렁임 + 리딩엣지 감쇠 */
+  const NPT=Math.max(28,Math.round(wl/9)),ys=[];
+  for(let i=0;i<=NPT;i++){
+    const fx=i/NPT;
+    const n=.5*Math.sin(fx*wl*.08+t*9)+.3*Math.sin(fx*wl*.21-t*14)
+           +.2*Math.sin(fx*wl*.44+t*23);
+    const lead=fx>.82?Math.max(.25,1-(fx-.82)/.18*.9):1;
+    const fh=h*(.30+.62*(over?1:.85)*(.5+.5*n))*lead;
+    ys.push(h-Math.max(2,fh));
+  }
+  const leadC=over?blinkC:SC[Math.min(SC.length-1,Math.floor(frac*SC.length))];
+  g.shadowColor=leadC;g.shadowBlur=16;
+  g.fillStyle=grad;
+  g.beginPath();g.moveTo(0,h);
+  ys.forEach((y,i)=>g.lineTo(i/NPT*wl,y));
+  g.lineTo(wl,h);g.closePath();g.fill();
+  g.shadowBlur=0;
+  /* 화이트 코어 (하단 열기) */
+  g.globalAlpha=.28;g.fillStyle='#fff';
+  g.beginPath();g.moveTo(0,h);
+  ys.forEach((y,i)=>g.lineTo(i/NPT*wl,h-(h-y)*.42));
+  g.lineTo(wl,h);g.closePath();g.fill();
+  g.globalAlpha=1;
+}
+
 function drawTires(){
-  const W=(T.wheels)||null;if(!W)return;
   for(const wn of ['fl','fr','rl','rr']){
-    const d=W[wn];if(!d)continue;
-    const t=d.temp_c||0;
+    const t=SM['t_'+wn]||0;
     const tc=t<60?'var(--blu)':(t<95?'var(--grn)':(t<110?'var(--amb)':'var(--red)'));
     const tt=$('tt_'+wn);tt.textContent=Math.round(t)+'°';tt.style.color=tc;
-    const cs=Math.min(3,d.combined||0);
+    const cs=Math.min(3,SM['c_'+wn]||0);
     const sc=cs<1?'var(--grn)':(cs<2?'var(--amb)':'var(--red)');
     const sb=$('ts_'+wn);sb.style.width=(cs/3*100)+'%';sb.style.background=sc;
-    $('tu_'+wn).style.width=(Math.min(1,Math.max(0,d.sus||0))*100)+'%';
+    $('tu_'+wn).style.width=(Math.min(1,Math.max(0,SM['u_'+wn]||0))*100)+'%';
   }
 }
 
@@ -867,12 +1063,11 @@ function drawGG(){
     g.moveTo(cx+BUF[i-1].lg*scale,cy-BUF[i-1].gg*scale);
     g.lineTo(cx+BUF[i].lg*scale,cy-BUF[i].gg*scale);g.stroke();}
   g.globalAlpha=1;
-  const last=BUF[BUF.length-1];
-  if(last){
+  {
     g.fillStyle=css('--tx');
-    g.beginPath();g.arc(cx+last.lg*scale,cy-last.gg*scale,9,0,7);g.fill();
-    /* 중앙 G값 대형 표기 (BMW M 방식) */
-    const cur=Math.hypot(last.lg,last.gg);
+    g.beginPath();g.arc(cx+D.latg*scale,cy-D.longg*scale,9,0,7);g.fill();
+    /* 중앙 G값 대형 표기 (BMW M 방식) — 프레임당 라이브 스무딩값 */
+    const cur=Math.hypot(D.latg,D.longg);
     g.font=`200 ${Math.round(R*0.4)}px Segoe UI`;
     g.textAlign='center';g.fillStyle=css('--tx');
     g.fillText(cur.toFixed(1),cx,cy-R*0.02);
@@ -903,7 +1098,7 @@ function drawMap(){
     g.beginPath();g.moveTo(sx(pts[i-1]),sy(pts[i-1]));
     g.lineTo(sx(pts[i]),sy(pts[i]));g.stroke();}
   g.globalAlpha=1;
-  const lp=pts[pts.length-1];
+  const lp={px:SM.px||0,pz:SM.pz||0};
   g.fillStyle=css('--tx');
   g.beginPath();g.arc(sx(lp),sy(lp),4,0,7);g.fill();
 }
@@ -984,14 +1179,15 @@ class WebUI(threading.Thread):
                 pass
 
             def do_GET(self):
-                if self.path == "/state":
+                path = self.path.split("?", 1)[0]  # ?th=... 쿼리 허용
+                if path == "/state":
                     body = json.dumps(_sanitize(provider())).encode()
                     ctype = "application/json"
-                elif self.path == "/":
+                elif path == "/":
                     body = PAGE.encode()
                     ctype = "text/html; charset=utf-8"
-                elif self.path in ("/left", "/right"):
-                    body = _side_page(self.path[1:]).encode()
+                elif path in ("/left", "/right"):
+                    body = _side_page(path[1:]).encode()
                     ctype = "text/html; charset=utf-8"
                 else:
                     self.send_response(404)

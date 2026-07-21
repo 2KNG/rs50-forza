@@ -6,6 +6,7 @@
 usage: python tools/demo_telemetry.py [분(기본 10)]
 """
 import math
+import os
 import socket
 import struct
 import sys
@@ -16,7 +17,9 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 import tomllib
 
-with open(ROOT / "config.toml", "rb") as f:
+# RS50_CONFIG로 개발용 설정(다른 UDP 포트) 지정 — 본 인스턴스와 분리 실행용
+_cfg = Path(os.environ.get("RS50_CONFIG") or ROOT / "config.toml")
+with open(_cfg, "rb") as f:
     PORT = tomllib.load(f)["telemetry"]["port"]
 
 IDLE, MAX = 900.0, 8500.0

@@ -7,6 +7,7 @@ usage:
 웹 대시보드: http://127.0.0.1:8777 (config [web])
 """
 import collections
+import os
 import sys
 import threading
 import time
@@ -23,7 +24,10 @@ from src.webui import WebUI
 
 
 def load_config():
-    p = Path(__file__).resolve().parent.parent / "config.toml"
+    # RS50_CONFIG로 대체 설정 지정 가능 — 본 인스턴스(8777) 옆에서
+    # 개발 인스턴스(다른 포트)를 띄울 때 사용.
+    env = os.environ.get("RS50_CONFIG")
+    p = Path(env) if env else Path(__file__).resolve().parent.parent / "config.toml"
     with open(p, "rb") as f:
         return tomllib.load(f)
 
