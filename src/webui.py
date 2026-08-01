@@ -384,6 +384,19 @@ html,body{height:100%}
 body{background:var(--bg);color:var(--tx);display:flex;flex-direction:column;
      padding:calc(var(--u)*1.6);padding-bottom:calc(var(--u)*7);
      gap:calc(var(--u)*1.4);overflow:hidden}
+.gv{position:fixed;pointer-events:none;z-index:1;opacity:0}
+#gvL{left:0;top:0;bottom:0;width:15vw;
+  background:linear-gradient(90deg,var(--acc),transparent)}
+#gvR{right:0;top:0;bottom:0;width:15vw;
+  background:linear-gradient(-90deg,var(--acc),transparent)}
+#gvT{top:0;left:0;right:0;height:13vh;
+  background:linear-gradient(180deg,var(--red),transparent)}
+#gvB{bottom:0;left:0;right:0;height:13vh;
+  background:linear-gradient(0deg,var(--grn),transparent)}
+body[data-gfx=off] .gv{display:none}
+.tire.hot{border-color:var(--red);
+  box-shadow:0 0 calc(var(--u)*1.6) rgba(255,59,59,.55);
+  transition:box-shadow .15s}
 #flash{position:fixed;inset:0;pointer-events:none;z-index:1;opacity:0;
   box-shadow:inset 0 0 calc(var(--u)*5) calc(var(--u)*.8) var(--pur);
   transition:opacity .08s}
@@ -401,8 +414,9 @@ body{background:var(--bg);color:var(--tx);display:flex;flex-direction:column;
 .switchers{margin-left:auto;display:flex;gap:calc(var(--u)*1.4)}
 .sw{display:flex;gap:calc(var(--u)*.4)}
 .sw button{background:var(--panel);color:var(--dim);border:1px solid var(--line);
-  border-radius:calc(var(--u)*.6);padding:calc(var(--u)*.4) calc(var(--u)*.9);
-  font-size:calc(var(--u)*.95);letter-spacing:1px;cursor:pointer}
+  border-radius:calc(var(--u)*.6);padding:calc(var(--u)*.35) calc(var(--u)*.7);
+  font-size:calc(var(--u)*.85);letter-spacing:1px;cursor:pointer;
+  white-space:nowrap}
 .sw button.on{color:var(--tx);border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
 .panel{background:var(--panel);border:1px solid var(--line);
   border-radius:calc(var(--u)*1.2)}
@@ -576,12 +590,15 @@ body[data-theme=gt] .gauge svg.face-std{display:none}
 body[data-theme=gt] #gearA,body[data-theme=gt] #spdTxt{display:none}
 body[data-theme=gt] .panel{border-radius:calc(var(--u)*1.6)}
 </style></head>
-<body data-theme="pit" data-display="analog" data-side="__SIDE__" data-revpos="top" data-revstyle="seg" data-numfont="segoe">
+<body data-theme="pit" data-display="analog" data-side="__SIDE__" data-revpos="top" data-revstyle="seg" data-numfont="segoe" data-gfx="on">
 <div id="flash"></div>
+<div class="gv" id="gvL"></div><div class="gv" id="gvR"></div>
+<div class="gv" id="gvT"></div><div class="gv" id="gvB"></div>
 <div class="top">
   <span class="brand">RS50 · __LABEL__</span>
   <span class="badge off" id="mode">대기</span><span class="dot" id="teldot"></span>
   <div class="switchers">
+    <nav class="sw" id="gfxsw"></nav>
     <nav class="sw" id="fontsw"></nav>
     <nav class="sw" id="barsw"></nav>
     <nav class="sw" id="fxsw"></nav>
@@ -637,6 +654,8 @@ buildSwitch('barsw',[['top','BAR\u2009\u25b2'],['both','BAR\u2009\u25b2\u25bc']]
   'revpos','rs50-revpos-'+SIDE,'top','bar');
 buildSwitch('fxsw',[['seg','SEG'],['flame','FIRE']],
   'revstyle','rs50-revstyle-'+SIDE,'seg','fx');
+buildSwitch('gfxsw',[['on','GFX'],['off','GFX✕']],
+  'gfx','rs50-gfx-'+SIDE,'on','gv');
 buildSwitch('fontsw',[['segoe','AA'],['din','DIN'],['mono','01'],['agency','AGY'],['impact','IMP'],['black','BLK'],['euro','EURO'],['orbit','ORBIT']],
   'numfont','rs50-numfont-'+SIDE,'segoe','fn');
 
@@ -750,6 +769,8 @@ if(SIDE==='left'){
           <circle cx="500" cy="500" r="14" fill="var(--gauge-fg)"/>
           <text id="gtSpd" x="500" y="680" font-size="150" font-weight="250" fill="var(--tx)" text-anchor="middle">0</text>
           <text x="500" y="730" font-size="28" letter-spacing="8" fill="var(--dim)" text-anchor="middle">KM/H</text>
+          <text x="500" y="880" font-size="24" letter-spacing="6" fill="var(--dim)" text-anchor="middle">TRIP KM</text>
+          <text id="gtTrip" x="500" y="936" font-size="52" font-weight="300" fill="var(--tx)" text-anchor="middle">0.0</text>
           <text x="60" y="880" font-size="24" letter-spacing="6" fill="var(--dim)">AVG</text>
           <text id="gtAvg" x="60" y="936" font-size="52" font-weight="300" fill="var(--tx)">-</text>
           <text x="940" y="880" font-size="24" letter-spacing="6" fill="var(--dim)" text-anchor="end">MAX</text>
@@ -842,6 +863,7 @@ if(SIDE==='left'){
     <div class="score">
       <span>PK <b id="sPk">0</b>°</span><span>MAX <b id="sG">0.0</b>G</span>
       <span>드리프트 <b id="sHold">0.0</b>s</span>
+      <span>TRIP <b id="sTrip">0.0</b>km</span>
       <span>CLASS <b id="carclass">-</b>·PI <b id="carpi">-</b></span>
     </div>
     </div>`;
@@ -915,7 +937,7 @@ async function poll(){
 }
 setInterval(poll,150); poll();
 
-let lastRender=0,prevTs=null,spdSum=0,spdT=0,spdMax=0;
+let lastRender=0,prevTs=null,spdSum=0,spdT=0,spdMax=0,trip=0;
 function render(ts){
   lastRender=performance.now();
   const dt=prevTs===null?1/60:Math.min(0.1,Math.max(0.001,(ts-prevTs)/1000));
@@ -967,6 +989,7 @@ function render(ts){
       spdMax=Math.max(spdMax,D.speed);}
     $('gtAvg').textContent=spdT>3?Math.round(spdSum/spdT):'-';
     $('gtMax').textContent=spdMax>1?Math.round(spdMax):'-';
+    $('gtTrip').textContent=trip.toFixed(1);
   }else{
     const ad=Math.abs(D.drift);
     $('drift').textContent=ad.toFixed(0);
@@ -984,6 +1007,15 @@ function render(ts){
     $('gval').textContent=Math.abs(D.latg).toFixed(1);
     $('gdot').style.left=(50+Math.max(-1,Math.min(1,D.latg/2))*46)+'%';
   }
+  /* G 비네트: 관성 방향으로 번지는 글로우 (0.35G부터, 1.5G 포화) */
+  if(document.body.dataset.gfx==='on'){
+    const gl=Math.max(0,Math.min(1,(Math.abs(D.latg)-0.35)/1.15));
+    $('gvL').style.opacity=D.latg<0?gl*.4:0;
+    $('gvR').style.opacity=D.latg>0?gl*.4:0;
+    $('gvT').style.opacity=Math.max(0,Math.min(1,(-D.longg-0.35)/1.1))*.45;
+    $('gvB').style.opacity=Math.max(0,Math.min(1,(D.longg-0.3)/1.2))*.3;
+  }
+  if(T.alive)trip+=D.speed/3.6*dt/1000;   /* km */
   sampleAndDraw(ts);
   /* rev 바 (바깥->중앙) */
   const over=T.alive&&T.ratio>=T.blink_ratio;
@@ -1025,7 +1057,7 @@ function sampleAndDraw(ts){
     lastSample=now;
     BUF.push({t:now,thr:SM.thr||0,brk:SM.brk||0,
       st:SM.st||0,hb:SM.hb||0,
-      lg:D.latg,gg:D.longg,
+      lg:D.latg,gg:D.longg,dr:Math.abs(D.drift),
       px:SM.px||0,pz:SM.pz||0});
     while(BUF.length&&now-BUF[0].t>20000)BUF.shift();
     const ad=Math.abs(T.alive?T.drift_deg:0);
@@ -1038,7 +1070,8 @@ function sampleAndDraw(ts){
   else{drawTires();drawTrace();drawMap();
     $('sPk').textContent=peak>=10?peak.toFixed(0):'0';
     $('sG').textContent=maxG.toFixed(1);
-    $('sHold').textContent=holdBest.toFixed(1);}
+    $('sHold').textContent=holdBest.toFixed(1);
+    $('sTrip').textContent=trip.toFixed(1);}
 }
 
 function drawFlame(id,ts){
@@ -1091,6 +1124,7 @@ function drawTires(){
     const cs=Math.min(3,SM['c_'+wn]||0);
     const sc=cs<1?'var(--grn)':(cs<2?'var(--amb)':'var(--red)');
     const sb=$('ts_'+wn);sb.style.width=(cs/3*100)+'%';sb.style.background=sc;
+    sb.parentElement.parentElement.classList.toggle('hot',cs>=2);
     $('tu_'+wn).style.width=(Math.min(1,Math.max(0,SM['u_'+wn]||0))*100)+'%';
   }
 }
@@ -1146,12 +1180,15 @@ function drawMap(){
   const span=Math.max(x1-x0,z1-z0,10),pad=12;
   const sx=p=>pad+((p.px-x0)/span)*(w-2*pad);
   const sy=p=>h-pad-((p.pz-z0)/span)*(h-2*pad);
-  const now=performance.now(),acc=css('--acc');
-  g.lineWidth=2;g.lineCap='round';
+  const now=performance.now();
+  g.lineCap='round';
   for(let i=1;i<pts.length;i++){
     const age=(now-pts[i].t)/20000;
     g.globalAlpha=Math.max(0.05,0.9*(1-age));
-    g.strokeStyle=acc;
+    /* 드리프트각으로 색칠: 그립(파랑)->한계(빨강), 각 클수록 굵게 */
+    const k=Math.min(1,(pts[i].dr||0)/45);
+    g.strokeStyle=`hsl(${200-200*k},95%,${55+15*k}%)`;
+    g.lineWidth=2+k*2.5;
     g.beginPath();g.moveTo(sx(pts[i-1]),sy(pts[i-1]));
     g.lineTo(sx(pts[i]),sy(pts[i]));g.stroke();}
   g.globalAlpha=1;
