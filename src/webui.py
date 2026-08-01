@@ -158,6 +158,12 @@ body[data-theme=neon]{--bg:#0d0221;--panel:#170b33;--line:#3b1a6e;--tx:#f3e9ff;
   --gauge-fg:#2be2ff;--gauge-dim:#8f7bb8;
   background-image:repeating-linear-gradient(transparent 0 39px,rgba(255,43,214,.07) 39px 40px),
    linear-gradient(#0d0221 60%,#1b0640)}
+body[data-theme=classic]{--bg:#E5DABC;--panel:#F2EAD3;--line:#C3B58F;
+  --tx:#1C1A17;--dim:#7A7059;--acc:#B5221E;--seg-off:#D3C7A6;
+  --gauge-fg:#1C1A17;--gauge-dim:#7A7059}
+body[data-theme=vfd]{--bg:#050A0C;--panel:#0A1214;--line:#123038;
+  --tx:#8CFFF0;--dim:#2A7C75;--acc:#35F0D8;--seg-off:#0E2A2E;
+  --gauge-fg:#8CFFF0;--gauge-dim:#2A7C75}
 body[data-theme=neon] #gear{background:linear-gradient(180deg,#2be2ff,#ff2bd6);
   -webkit-background-clip:text;background-clip:text;color:transparent;
   filter:drop-shadow(0 0 calc(var(--u)*1.3) rgba(255,43,214,.5))}
@@ -220,7 +226,7 @@ const N=10;
 let SEG=['var(--grn)','var(--grn)','var(--grn)','var(--red)','var(--red)',
          'var(--red)','var(--red)','var(--blu)','var(--blu)','var(--blu)'];
 let BLINK_COLOR='var(--pur)';
-const THEMES=[['pit','PIT'],['gt','GT'],['f1','F1'],['retro','RETRO'],['minimal','OLED'],['neon','NEON']];
+const THEMES=[['pit','PIT'],['gt','GT'],['f1','F1'],['retro','RETRO'],['minimal','OLED'],['neon','NEON'],['classic','CLASSIC'],['vfd','VFD']];
 const DISPLAYS=[['digital','DIGITAL'],['analog','ANALOG']];
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
@@ -639,6 +645,39 @@ body[data-theme=gt] .gauge svg.face-gt{display:block}
 body[data-theme=gt] .gauge svg.face-std{display:none}
 body[data-theme=gt] #gearA,body[data-theme=gt] #spdTxt{display:none}
 body[data-theme=gt] .panel{border-radius:calc(var(--u)*1.6)}
+
+/* CLASSIC — 1950~70s 영국 클래식 (Smiths/Jaeger 마그놀리아 크림 + 검정 잉크) */
+body[data-theme=classic]{--bg:#E5DABC;--panel:#F2EAD3;--line:#C3B58F;
+  --tx:#1C1A17;--dim:#7A7059;--acc:#B5221E;--seg-off:#D3C7A6;
+  --grn:#2f7d3f;--red:#B5221E;--amb:#C98A00;--blu:#2b5f8f;--pur:#6b3fa0;
+  --gauge-fg:#1C1A17;--gauge-dim:#7A7059;
+  background-image:radial-gradient(120% 100% at 50% 0%,#F0E7CC 0,#DCCFAC 100%)}
+body[data-theme=classic] .panel{
+  box-shadow:inset 0 0 calc(var(--u)*3) rgba(120,100,60,.18),
+             0 calc(var(--u)*.2) calc(var(--u)*.6) rgba(0,0,0,.25);
+  border-color:#B9A87E}
+body[data-theme=classic] .needle{filter:drop-shadow(2px 3px 2px rgba(0,0,0,.35))}
+body[data-theme=classic] .badge.auto{background:#cfe3cf;color:#1f5c2b}
+body[data-theme=classic] .badge.off{background:#d8ccab;color:#6b6250}
+body[data-theme=classic] #gear,body[data-theme=classic] #gearA,
+body[data-theme=classic] #gtGear{text-shadow:none}
+/* VFD — 1980s 디지털 계기판 (ZnO:Zn 505nm 시안 발광 + 미점등 고스팅) */
+body[data-theme=vfd]{--bg:#050A0C;--panel:#0A1214;--line:#123038;
+  --tx:#8CFFF0;--dim:#2A7C75;--acc:#35F0D8;--seg-off:#0E2A2E;
+  --grn:#66FF66;--red:#FF3B30;--amb:#FFB000;--blu:#35D8F0;--pur:#C06BFF;
+  --gauge-fg:#8CFFF0;--gauge-dim:#2A7C75;
+  background-image:repeating-linear-gradient(0deg,
+    rgba(0,255,214,.035) 0 1px,transparent 1px 3px)}
+body[data-theme=vfd] #speed,body[data-theme=vfd] #spdTxt,
+body[data-theme=vfd] #gear,body[data-theme=vfd] #gearA,
+body[data-theme=vfd] #drift,body[data-theme=vfd] #driftA,
+body[data-theme=vfd] .tire .tt,body[data-theme=vfd] .score b,
+body[data-theme=vfd] .dscore .sv{
+  text-shadow:0 0 calc(var(--u)*.5) currentColor,
+              0 0 calc(var(--u)*1.6) rgba(0,255,214,.55)}
+body[data-theme=vfd] .panel{box-shadow:inset 0 0 calc(var(--u)*2.5) rgba(0,255,214,.07)}
+body[data-theme=vfd] .rev div{border-color:#1b4a50}
+body[data-theme=vfd] .tick{stroke:var(--gauge-dim);opacity:.85}
 </style></head>
 <body data-theme="pit" data-display="analog" data-side="__SIDE__" data-revpos="top" data-revstyle="seg" data-numfont="segoe" data-gfx="on" data-cfg="off">
 <div id="flash"></div>
@@ -675,7 +714,7 @@ body[data-theme=gt] .panel{border-radius:calc(var(--u)*1.6)}
 const SIDE='__SIDE__', N=12;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-const THEMES=[['pit','PIT'],['gt','GT'],['f1','F1'],['retro','RETRO'],['minimal','OLED'],['neon','NEON']];
+const THEMES=[['pit','PIT'],['gt','GT'],['f1','F1'],['retro','RETRO'],['minimal','OLED'],['neon','NEON'],['classic','CLASSIC'],['vfd','VFD']];
 const DISPLAYS=[['digital','DIG'],['analog','ANA']];
 
 function gearFx(el,val){
