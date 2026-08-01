@@ -549,7 +549,7 @@ canvas.widget{background:var(--panel);border:1px solid var(--line);
 .dscore .mx{font-family:var(--numfont);font-size:calc(var(--u)*2.6);
   font-weight:800;color:var(--amb);letter-spacing:1px;white-space:pre-line}
 .dscore.idle{opacity:.42}
-.dscore.idle .sv{font-size:calc(var(--u)*3)}
+.dscore.idle .sv{display:none}
 .dscore.idle .mx{font-size:calc(var(--u)*1.35);letter-spacing:0}
 .dscore .mx{max-width:calc(var(--u)*17);line-height:1.25}
 .dscore.dirty .sv{color:var(--red);text-shadow:none}
@@ -969,15 +969,7 @@ if(SIDE==='left'){
     </div>
     <div class="gauge panel ana sq" id="driftGWrap" style="padding:calc(var(--u)*1)">
       <svg viewBox="0 0 240 150">
-        <!-- 존 밴드: 20~50 목표(초록) / 50~65 앰버 / 65+ 적색(스핀 임박) -->
-        <g fill="none" stroke-linecap="butt" opacity=".55">
-          <path d="M 71.4 51.4 A 96 96 0 0 1 96.7 37.1" stroke="var(--grn)" stroke-width="7"/>
-          <path d="M 143.3 37.1 A 96 96 0 0 1 168.6 51.4" stroke="var(--grn)" stroke-width="7"/>
-          <path d="M 55.9 72.5 A 96 96 0 0 1 71.4 51.4" stroke="var(--amb)" stroke-width="7"/>
-          <path d="M 168.6 51.4 A 96 96 0 0 1 184.1 72.5" stroke="var(--amb)" stroke-width="7"/>
-          <path d="M 49.4 89.9 A 96 96 0 0 1 55.9 72.5" stroke="var(--red)" stroke-width="7"/>
-          <path d="M 184.1 72.5 A 96 96 0 0 1 190.6 89.9" stroke="var(--red)" stroke-width="7"/>
-        </g>
+        <g id="dzones"></g>
         <g id="dticks"></g>
         <line id="dghost" class="ghost" x1="120" y1="130" x2="120" y2="34"
               stroke-width="2" style="transform-origin:120px 130px"/>
@@ -1019,6 +1011,22 @@ if(SIDE==='left'){
         <span class="blab">SUS</span></div>`;
     $('tires').appendChild(d);
   }
+  /* 존 밴드: 눈금과 같은 각도식(deg x 1.25)으로 생성해 정렬을 보장 */
+  const zone=(d0,d1,r)=>{
+    const a0=d0*1.25*Math.PI/180,a1=d1*1.25*Math.PI/180;
+    return `M ${120+r*Math.sin(a0)} ${130-r*Math.cos(a0)} `
+      +`A ${r} ${r} 0 0 1 ${120+r*Math.sin(a1)} ${130-r*Math.cos(a1)}`;
+  };
+  let zm='';
+  for(const [d0,d1,c] of [[20,50,'var(--grn)'],[50,65,'var(--amb)'],
+                          [65,72,'var(--red)']]){
+    for(const sgn of [1,-1]){
+      const p=sgn>0?zone(d0,d1,101):zone(-d1,-d0,101);
+      zm+=`<path d="${p}" stroke="${c}" stroke-width="6" fill="none"
+        stroke-linecap="butt" opacity=".55"/>`;
+    }
+  }
+  $('dzones').innerHTML=zm;
   const tg=$('dticks');
   for(let d=-60;d<=60;d+=15){
     const a=d/60*75*Math.PI/180, r1=96, r2=(d%30===0)?84:90;
@@ -1198,8 +1206,10 @@ function render(ts){
     $('dghost').style.transform=`rotate(${clamp(peak*peakSign)/60*75}deg)`;
     $('dghost').style.opacity=peak>=10?.55:0;
     const gw=$('driftGWrap');
-    if(gw){gw.classList.toggle('sweet',ad>=20&&ad<=50);
-      gw.classList.toggle('over',ad>65);}
+    if(gw){                       /* 주행 중일 때만 — 정차/후진 오탐 방지 */
+      const live=T.alive&&D.speed>30&&ad<=100;
+      gw.classList.toggle('sweet',live&&ad>=20&&ad<=50);
+      gw.classList.toggle('over',live&&ad>65);}
     $('gval').textContent=Math.abs(D.latg).toFixed(1);
     $('gdot').style.left=(50+Math.max(-1,Math.min(1,D.latg/2))*46)+'%';
   }
