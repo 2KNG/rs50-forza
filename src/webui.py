@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 import math
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 PAGE = r"""<!doctype html>
@@ -1018,7 +1019,7 @@ let D={ratio:0,rpm:0,speed:0,drift:0,latg:0,longg:0};
    지수 스무딩은 시정수 뒤 평탄해져 계단이 남지만, 이 방식은 다음 샘플이
    올 때까지 계속 움직이므로 페달/조향 트레이스가 완전히 이어진다. */
 const SM={},PREV={},CUR={};
-let pollAt=0,pollDt=150;
+let pollAt=0,pollDt=40;   /* SSE 30Hz 기준, 폴링 폴백 시 자동 추종 */
 const CH=[['thr',t=>(t.accel||0)/255],['brk',t=>(t.brake||0)/255],
   ['st',t=>(t.steer||0)/127],['hb',t=>(t.handbrake||0)/255],
   ['px',t=>t.pos_x||0],['pz',t=>t.pos_z||0]];
@@ -1029,7 +1030,7 @@ for(const wn of ['fl','fr','rl','rr']){
 }
 function snapPush(t){                    /* 폴 수신 시 1회 */
   const now=performance.now();
-  if(pollAt)pollDt=pollDt*0.7+Math.min(400,Math.max(60,now-pollAt))*0.3;
+  if(pollAt)pollDt=pollDt*0.7+Math.min(400,Math.max(16,now-pollAt))*0.3;
   pollAt=now;
   for(const [k,f] of CH){
     const v=f(t),nv=isFinite(v)?v:0;
@@ -1046,10 +1047,9 @@ function snapLerp(){                     /* 매 프레임 */
 let lastGear=null,lastEvents='',fails=0,inflight=false,peak=0,peakTs=0,peakSign=1;
 const CLS=['D','C','B','A','S1','S2','X','X'];
 
-async function poll(){
-  if(inflight)return; inflight=true;
+function applyState(js){
   try{
-    T=await (await fetch('/state')).json(); fails=0;
+    T=js; fails=0;
     const cl=(v,lo,hi)=>isFinite(v)?Math.min(hi,Math.max(lo,v)):0;
     T.ratio=cl(T.ratio,0,1.5);T.speed_kmh=cl(T.speed_kmh,0,600);
     T.rpm=cl(T.rpm,0,30000);T.max_rpm=cl(T.max_rpm,0,30000);
@@ -1075,12 +1075,33 @@ async function poll(){
       $('carclass').textContent=CLS[T.car_class]||'-';
       $('carpi').textContent=T.car_pi||'-';
     }
-  }catch(e){
-    if(++fails>=3){T.alive=false;
-      const b=$('mode');b.textContent='연결 끊김';b.className='badge lost';}
-  }finally{inflight=false;}
+  }catch(e){}
 }
-setInterval(poll,150); poll();
+function connLost(){
+  if(++fails>=3){T.alive=false;
+    const b=$('mode');b.textContent='연결 끊김';b.className='badge lost';}
+}
+/* 중앙 푸시(SSE): 서버가 모든 창에 같은 프레임을 동시에 보낸다 —
+   창마다 폴링 위상이 달라 값이 어긋나던 문제 해결. 실패 시 폴링 폴백. */
+let esrc=null,pollTimer=null;
+async function poll(){
+  if(inflight)return; inflight=true;
+  try{applyState(await (await fetch('/state')).json());}
+  catch(e){connLost();}
+  finally{inflight=false;}
+}
+function startPolling(){if(!pollTimer)pollTimer=setInterval(poll,150);}
+function startStream(){
+  /* ?stream=off = 폴링 강제 (헤드리스 캡처는 열린 SSE 연결에서 멈춘다) */
+  if(!('EventSource' in window)||
+     new URLSearchParams(location.search).get('stream')==='off'){
+    startPolling();return;}
+  esrc=new EventSource('/events');
+  esrc.onmessage=e=>{try{applyState(JSON.parse(e.data));}catch(_){}};
+  esrc.onerror=()=>{connLost();
+    if(esrc&&esrc.readyState===2){esrc=null;startPolling();}};
+}
+poll(); startStream();
 
 let lastRender=0,prevTs=null,spdSum=0,spdT=0,spdMax=0,trip=0;
 function render(ts){
@@ -1159,7 +1180,7 @@ function render(ts){
   /* rev 바 (바깥->중앙) */
   const over=T.alive&&T.ratio>=T.blink_ratio;
   /* 오버레브: 실차식 풀스트립 고속 점멸 (웹은 FFB 제약 없음 — 화끈하게) */
-  const blinkOn=over&&Math.floor(ts/1000*2*(T.blink_hz||8))%2===0;
+  const blinkOn=over&&Math.floor(Date.now()/1000*2*(T.blink_hz||4))%2===0;
   const lit=D.ratio<=T.start_ratio?0:
     Math.min(N,Math.max(1,Math.round((D.ratio-T.start_ratio)/(T.blink_ratio-T.start_ratio)*N)));
   const SC=T.seg_colors&&T.seg_colors.ltr;
@@ -1267,7 +1288,7 @@ function drawFlame(id,ts){
   g.clearRect(0,0,w,h);
   if(!T.alive||!w)return;
   const over=T.ratio>=T.blink_ratio;
-  const blinkOn=over&&Math.floor(ts/1000*2*(T.blink_hz||8))%2===0;
+  const blinkOn=over&&Math.floor(Date.now()/1000*2*(T.blink_hz||4))%2===0;
   if(over&&!blinkOn)return;              /* 점멸 OFF 위상 */
   const frac=over?1:Math.min(1,Math.max(0,
     (D.ratio-T.start_ratio)/(T.blink_ratio-T.start_ratio)));
@@ -1556,6 +1577,7 @@ def _sanitize(d):
 
 _ASSETS = Path(__file__).resolve().parent.parent / "assets" / "fonts"
 _FONT_FILES = {"Michroma-Regular.ttf", "Orbitron-VariableFont_wght.ttf"}
+_STREAM_DT = 1 / 30  # SSE 푸시 주기 (모든 창 공통 프레임)
 
 
 class WebUI(threading.Thread):
@@ -1606,6 +1628,24 @@ class WebUI(threading.Thread):
                 elif path in ("/left", "/right"):
                     body = _side_page(path[1:]).encode()
                     ctype = "text/html; charset=utf-8"
+                elif path == "/events":
+                    # 중앙 푸시: 접속한 모든 창에 같은 프레임을 동시에 전송
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/event-stream")
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("Connection", "close")
+                    self.end_headers()
+                    self.close_connection = True
+                    try:
+                        while True:
+                            payload = json.dumps(_sanitize(provider()))
+                            self.wfile.write(b"data: " + payload.encode()
+                                             + b"\n\n")
+                            self.wfile.flush()
+                            time.sleep(_STREAM_DT)
+                    except Exception:
+                        pass  # 창을 닫으면 파이프가 끊긴다 (정상 종료)
+                    return
                 elif path == "/config":
                     body = CONFIG_TMPL.encode()
                     ctype = "text/html; charset=utf-8"
