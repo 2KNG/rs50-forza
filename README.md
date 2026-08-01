@@ -1,4 +1,4 @@
-# RS50 × Forza Horizon 6 — 드리프트 텔레메트리 대시보드
+# Forza Drift Dash — 드리프트 텔레메트리 대시보드
 
 > **EN TL;DR** — Zero-dependency telemetry dashboard for Forza Horizon (FH4-layout
 > UDP "Data Out") built for a 4K triple-monitor drift setup: `/left` shows driving
@@ -9,8 +9,10 @@
 > CONFIG panel that syncs both windows live, G-force screen vignette, and
 > full-channel 60 fps interpolation. Pure Python stdlib server + vanilla JS.
 > Windows 10/11, Python 3.11+. Run `start.bat`. Docs are Korean.
-> The repo also contains the first public protocol-level documentation of the
-> Logitech RS50's HID++ LED/FFB pipeline — see [FFB_DEBUG.md](FFB_DEBUG.md).
+> Originally built for a Logitech RS50 wheel; the wheel-side features were retired
+> (see the research section) and the repo also contains the first public
+> protocol-level documentation of the RS50's HID++ LED/FFB pipeline —
+> see [FFB_DEBUG.md](FFB_DEBUG.md).
 
 트리플 모니터(좌/중앙 게임/우)용 **순수 텔레메트리 대시보드**입니다.
 게임 옆 모니터 2장을 실차 계기판으로 만듭니다. 휠/게임에는 아무것도 쓰지 않고
