@@ -382,8 +382,10 @@ SIDE_TMPL = r"""<!doctype html>
 *{margin:0;box-sizing:border-box;font-family:'Segoe UI',system-ui,sans-serif}
 html,body{height:100%}
 body{background:var(--bg);color:var(--tx);display:flex;flex-direction:column;
-     padding:calc(var(--u)*1.6);padding-bottom:calc(var(--u)*7);
-     gap:calc(var(--u)*1.4);overflow:hidden}
+     padding:calc(var(--u)*1.6);gap:calc(var(--u)*1.2);overflow:hidden}
+/* 하단 바 사용 시 본문이 그만큼 줄어들도록 (겹침 방지) */
+main{overflow:hidden}
+#trace{flex:0 0 auto}
 .gv{position:fixed;pointer-events:none;z-index:1;opacity:0}
 #gvL{left:0;top:0;bottom:0;width:15vw;
   background:linear-gradient(90deg,var(--acc),transparent)}
@@ -411,6 +413,34 @@ body[data-gfx=off] .gv{display:none}
 .badge.off{background:#22262e;color:var(--dim)}
 .badge.lost{background:#33090c;color:var(--red)}
 @keyframes pulse{50%{box-shadow:0 0 calc(var(--u)*1.4) rgba(255,176,32,.5)}}
+.cfgbtn{margin-left:auto;background:var(--panel);color:var(--tx);
+  border:1px solid var(--acc);border-radius:calc(var(--u)*.7);
+  padding:calc(var(--u)*.45) calc(var(--u)*1.3);cursor:pointer;
+  font-size:calc(var(--u)*1.1);font-weight:700;letter-spacing:2px}
+.cfgbtn:hover{box-shadow:0 0 0 1px var(--acc)}
+.cfgmask{position:fixed;inset:0;z-index:20;display:none;
+  align-items:center;justify-content:center;background:rgba(0,0,0,.72)}
+body[data-cfg=on] .cfgmask{display:flex}
+.cfgpanel{background:var(--panel);border:1px solid var(--line);
+  border-radius:calc(var(--u)*1.4);padding:calc(var(--u)*2);
+  width:min(84vw,calc(var(--u)*62));max-height:88vh;overflow-y:auto;
+  box-shadow:0 calc(var(--u)*2) calc(var(--u)*5) rgba(0,0,0,.6)}
+.cfghead{display:flex;align-items:baseline;gap:calc(var(--u)*1.2);
+  margin-bottom:calc(var(--u)*1.6);padding-bottom:calc(var(--u)*1);
+  border-bottom:1px solid var(--line)}
+.cfghead b{font-size:calc(var(--u)*1.8);letter-spacing:3px}
+.cfghead span{color:var(--dim);font-size:calc(var(--u)*1.05)}
+.cfghead button{margin-left:auto;background:none;border:none;color:var(--dim);
+  font-size:calc(var(--u)*1.8);cursor:pointer;line-height:1}
+.cfgrow{display:flex;align-items:center;gap:calc(var(--u)*1.2);
+  padding:calc(var(--u)*.7) 0}
+.cfgrow>label{width:calc(var(--u)*9);flex:0 0 auto;color:var(--dim);
+  font-size:calc(var(--u)*1.1);letter-spacing:1px}
+.cfgrow .sw{flex-wrap:wrap}
+.cfgrow .sw button{font-size:calc(var(--u)*1);
+  padding:calc(var(--u)*.45) calc(var(--u)*1)}
+.cfgnote{margin-top:calc(var(--u)*1.4);color:var(--dim);
+  font-size:calc(var(--u)*.95);line-height:1.6}
 .switchers{margin-left:auto;display:flex;gap:calc(var(--u)*1.4)}
 .sw{display:flex;gap:calc(var(--u)*.4)}
 .sw button{background:var(--panel);color:var(--dim);border:1px solid var(--line);
@@ -610,7 +640,7 @@ body[data-theme=gt] .gauge svg.face-std{display:none}
 body[data-theme=gt] #gearA,body[data-theme=gt] #spdTxt{display:none}
 body[data-theme=gt] .panel{border-radius:calc(var(--u)*1.6)}
 </style></head>
-<body data-theme="pit" data-display="analog" data-side="__SIDE__" data-revpos="top" data-revstyle="seg" data-numfont="segoe" data-gfx="on">
+<body data-theme="pit" data-display="analog" data-side="__SIDE__" data-revpos="top" data-revstyle="seg" data-numfont="segoe" data-gfx="on" data-cfg="off">
 <div id="flash"></div>
 <div class="gv" id="gvL"></div><div class="gv" id="gvR"></div>
 <div class="gv" id="gvT"></div><div class="gv" id="gvB"></div>
@@ -618,13 +648,22 @@ body[data-theme=gt] .panel{border-radius:calc(var(--u)*1.6)}
 <div class="top">
   <span class="brand">RS50 · __LABEL__</span>
   <span class="badge off" id="mode">대기</span><span class="dot" id="teldot"></span>
-  <div class="switchers">
-    <nav class="sw" id="gfxsw"></nav>
-    <nav class="sw" id="fontsw"></nav>
-    <nav class="sw" id="barsw"></nav>
-    <nav class="sw" id="fxsw"></nav>
-    <nav class="sw" id="displaysw"></nav>
-    <nav class="sw" id="themes"></nav>
+  <button class="cfgbtn" id="cfgOpen">⚙ CONFIG</button>
+</div>
+<div class="cfgmask" id="cfgMask">
+  <div class="cfgpanel" id="cfgPanel">
+    <div class="cfghead"><b>CONFIG</b>
+      <span>변경은 좌/우 화면에 동시 적용됩니다</span>
+      <button id="cfgClose">✕</button></div>
+    <div class="cfgrow"><label>테마</label><nav class="sw" id="themes"></nav></div>
+    <div class="cfgrow"><label>숫자 폰트</label><nav class="sw" id="fontsw"></nav></div>
+    <div class="cfgrow"><label>표시 모드</label><nav class="sw" id="displaysw"></nav></div>
+    <div class="cfgrow"><label>REV 바</label><nav class="sw" id="barsw"></nav></div>
+    <div class="cfgrow"><label>바 스타일</label><nav class="sw" id="fxsw"></nav></div>
+    <div class="cfgrow"><label>G 이펙트</label><nav class="sw" id="gfxsw"></nav></div>
+    <div class="cfgnote">단축키: <b>C</b> 설정 열기/닫기 &middot; <b>ESC</b> 닫기<br>
+      URL 파라미터로도 강제 가능:
+      <code>?th=gt&amp;fn=din&amp;bar=both&amp;fx=flame&amp;dsp=analog&amp;gv=on</code></div>
   </div>
 </div>
 <div class="revzone" id="revTop"><div class="rev" id="rev"></div>
@@ -653,6 +692,12 @@ function gearFx(el,val){
   setTimeout(()=>gh.remove(),460);
 }
 
+/* 설정은 전역(좌/우 공유) — BroadcastChannel로 다른 창에 즉시 반영 */
+const SWREG={};
+const CFGBUS=('BroadcastChannel' in window)?new BroadcastChannel('rs50-cfg'):null;
+if(CFGBUS)CFGBUS.onmessage=e=>{
+  const{key,value}=e.data||{};const fn=SWREG[key];if(fn)fn(value,false);
+};
 function buildSwitch(navId, items, dataKey, storeKey, defval, qsKey){
   const nav=$(navId);
   items.forEach(([key,label])=>{
@@ -660,25 +705,38 @@ function buildSwitch(navId, items, dataKey, storeKey, defval, qsKey){
     b.textContent=label;b.dataset.v=key;b.onclick=()=>set(key,true);
     nav.appendChild(b);
   });
-  function set(v,persist){
+  function set(v,broadcast){
     document.body.dataset[dataKey]=v;
-    if(persist)localStorage.setItem(storeKey,v);
+    localStorage.setItem(storeKey,v);
     [...nav.children].forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+    if(broadcast&&CFGBUS)CFGBUS.postMessage({key:dataKey,value:v});
   }
+  SWREG[dataKey]=set;
   const q=new URLSearchParams(location.search).get(qsKey);
   const pick=[q,localStorage.getItem(storeKey)].find(x=>items.some(([k])=>k===x));
-  set(pick||defval,false);
+  document.body.dataset[dataKey]=pick||defval;
+  [...nav.children].forEach(b=>b.classList.toggle('on',b.dataset.v===(pick||defval)));
 }
+/* 설정창 열고 닫기 */
+function cfgSet(on){document.body.dataset.cfg=on?'on':'off';}
+if(new URLSearchParams(location.search).get('cfg')==='1')cfgSet(true);
+$('cfgOpen').onclick=()=>cfgSet(document.body.dataset.cfg!=='on');
+$('cfgClose').onclick=()=>cfgSet(false);
+$('cfgMask').onclick=e=>{if(e.target===$('cfgMask'))cfgSet(false);};
+addEventListener('keydown',e=>{
+  if(e.key==='Escape')cfgSet(false);
+  else if(e.key==='c'||e.key==='C')cfgSet(document.body.dataset.cfg!=='on');
+});
 buildSwitch('themes',THEMES,'theme','rs50-theme','pit','th');
-buildSwitch('displaysw',DISPLAYS,'display','rs50-display-'+SIDE,'analog','dsp');
+buildSwitch('displaysw',DISPLAYS,'display','rs50-display','analog','dsp');
 buildSwitch('barsw',[['top','BAR\u2009\u25b2'],['both','BAR\u2009\u25b2\u25bc']],
-  'revpos','rs50-revpos-'+SIDE,'top','bar');
+  'revpos','rs50-revpos','top','bar');
 buildSwitch('fxsw',[['seg','SEG'],['flame','FIRE']],
-  'revstyle','rs50-revstyle-'+SIDE,'seg','fx');
+  'revstyle','rs50-revstyle','seg','fx');
 buildSwitch('gfxsw',[['on','GFX'],['off','GFX✕']],
-  'gfx','rs50-gfx-'+SIDE,'on','gv');
+  'gfx','rs50-gfx','on','gv');
 buildSwitch('fontsw',[['segoe','AA'],['din','DIN'],['mono','01'],['agency','AGY'],['impact','IMP'],['black','BLK'],['euro','EURO'],['orbit','ORBIT']],
-  'numfont','rs50-numfont-'+SIDE,'segoe','fn');
+  'numfont','rs50-numfont','segoe','fn');
 
 /* ===== 레이아웃 ===== */
 if(SIDE==='left'){
