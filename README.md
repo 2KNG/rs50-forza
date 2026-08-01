@@ -4,8 +4,10 @@
 > UDP "Data Out") built for a 4K triple-monitor drift setup: `/left` shows driving
 > essentials (GT7-style tacho, analog speedo, G-G meter), `/right` is all drift
 > (drift-angle dial, lat-G bar, tire temps/slip, driving line map, input trace,
-> scoreboard). 6 themes, per-monitor toggles (fonts, flame-style rev bar, dual rev
-> bars), full-channel 60 fps interpolation. Pure Python stdlib server + vanilla JS.
+> scoreboard) plus a drift scorer with combo chain and tier callouts. 8 themes
+> (incl. 1960s Smiths-style CLASSIC and 1980s VFD), 8 numeral fonts, a shared
+> CONFIG panel that syncs both windows live, G-force screen vignette, and
+> full-channel 60 fps interpolation. Pure Python stdlib server + vanilla JS.
 > Windows 10/11, Python 3.11+. Run `start.bat`. Docs are Korean.
 > The repo also contains the first public protocol-level documentation of the
 > Logitech RS50's HID++ LED/FFB pipeline — see [FFB_DEBUG.md](FFB_DEBUG.md).
