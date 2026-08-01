@@ -251,7 +251,7 @@ function buildSwitch(navId, items, dataKey, storeKey, defval){
   set(items.some(([k])=>k===stored)?stored:defval);  // 무효 저장값 방어
 }
 buildSwitch('themes',THEMES,'theme','rs50-theme','pit');
-buildSwitch('displaysw',DISPLAYS,'display','rs50-display','digital');
+buildSwitch('displaysw',DISPLAYS,'display','rs50-display-main','digital');
 
 /* rev 스트립 */
 const strip=$('strip');
@@ -403,6 +403,10 @@ main{overflow:hidden}
 #gvB{bottom:0;left:0;right:0;height:13vh;
   background:linear-gradient(0deg,var(--grn),transparent)}
 body[data-gfx=off] .gv{display:none}
+#driftGWrap.sweet{border-color:var(--grn);
+  box-shadow:0 0 calc(var(--u)*1.8) rgba(43,212,95,.45)}
+#driftGWrap.over{border-color:var(--red);
+  box-shadow:0 0 calc(var(--u)*1.8) rgba(255,59,59,.5)}
 .tire.hot{border-color:var(--red);
   box-shadow:0 0 calc(var(--u)*1.6) rgba(255,59,59,.55);
   transition:box-shadow .15s}
@@ -534,14 +538,20 @@ canvas.widget{background:var(--panel);border:1px solid var(--line);
 .tbar{position:relative;height:calc(var(--u)*.9);background:var(--seg-off);
   border-radius:calc(var(--u)*.45);overflow:hidden}
 .tbar div{position:absolute;left:0;top:0;bottom:0;border-radius:inherit}
+.tbar .blab{position:absolute;right:calc(var(--u)*.4);top:50%;
+  transform:translateY(-50%);font-size:calc(var(--u)*.62);color:var(--dim);
+  letter-spacing:1px;pointer-events:none}
 .dscore{position:absolute;left:calc(var(--u)*2.4);top:calc(var(--u)*1.8);
   text-align:left;pointer-events:none;z-index:2}
 .dscore .sv{font-family:var(--numfont);font-size:calc(var(--u)*5.2);
   font-weight:800;line-height:1;color:var(--tx);
   font-variant-numeric:tabular-nums;text-shadow:0 0 calc(var(--u)*1.2) var(--acc)}
 .dscore .mx{font-family:var(--numfont);font-size:calc(var(--u)*2.6);
-  font-weight:800;color:var(--amb);letter-spacing:1px}
-.dscore.idle{opacity:.35}
+  font-weight:800;color:var(--amb);letter-spacing:1px;white-space:pre-line}
+.dscore.idle{opacity:.42}
+.dscore.idle .sv{font-size:calc(var(--u)*3)}
+.dscore.idle .mx{font-size:calc(var(--u)*1.35);letter-spacing:0}
+.dscore .mx{max-width:calc(var(--u)*17);line-height:1.25}
 .dscore.dirty .sv{color:var(--red);text-shadow:none}
 #callout{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%);
   z-index:7;pointer-events:none;font-family:var(--numfont);font-weight:800;
@@ -957,6 +967,15 @@ if(SIDE==='left'){
     </div>
     <div class="gauge panel ana sq" id="driftGWrap" style="padding:calc(var(--u)*1)">
       <svg viewBox="0 0 240 150">
+        <!-- 존 밴드: 20~50 목표(초록) / 50~65 앰버 / 65+ 적색(스핀 임박) -->
+        <g fill="none" stroke-linecap="butt" opacity=".55">
+          <path d="M 71.4 51.4 A 96 96 0 0 1 96.7 37.1" stroke="var(--grn)" stroke-width="7"/>
+          <path d="M 143.3 37.1 A 96 96 0 0 1 168.6 51.4" stroke="var(--grn)" stroke-width="7"/>
+          <path d="M 55.9 72.5 A 96 96 0 0 1 71.4 51.4" stroke="var(--amb)" stroke-width="7"/>
+          <path d="M 168.6 51.4 A 96 96 0 0 1 184.1 72.5" stroke="var(--amb)" stroke-width="7"/>
+          <path d="M 49.4 89.9 A 96 96 0 0 1 55.9 72.5" stroke="var(--red)" stroke-width="7"/>
+          <path d="M 184.1 72.5 A 96 96 0 0 1 190.6 89.9" stroke="var(--red)" stroke-width="7"/>
+        </g>
         <g id="dticks"></g>
         <line id="dghost" class="ghost" x1="120" y1="130" x2="120" y2="34"
               stroke-width="2" style="transform-origin:120px 130px"/>
@@ -994,7 +1013,8 @@ if(SIDE==='left'){
     const d=document.createElement('div');d.className='tire';
     d.innerHTML=`<div class="tl"><span>${wn.toUpperCase()}</span><span class="tt" id="tt_${wn}">-</span></div>
       <div class="tbar"><div id="ts_${wn}"></div></div>
-      <div class="tbar"><div id="tu_${wn}" style="background:var(--dim);opacity:.7"></div></div>`;
+      <div class="tbar"><div id="tu_${wn}" style="background:var(--dim);opacity:.7"></div>
+        <span class="blab">SUS</span></div>`;
     $('tires').appendChild(d);
   }
   const tg=$('dticks');
@@ -1033,7 +1053,7 @@ function snapPush(t){                    /* 폴 수신 시 1회 */
   if(pollAt)pollDt=pollDt*0.7+Math.min(400,Math.max(16,now-pollAt))*0.3;
   pollAt=now;
   for(const [k,f] of CH){
-    const v=f(t),nv=isFinite(v)?v:0;
+    const v=t.alive?f(t):0,nv=isFinite(v)?v:0;   /* 끊기면 0으로 감쇠 */
     PREV[k]=isFinite(SM[k])?SM[k]:nv;CUR[k]=nv;
   }
 }
@@ -1054,7 +1074,7 @@ function applyState(js){
     T.ratio=cl(T.ratio,0,1.5);T.speed_kmh=cl(T.speed_kmh,0,600);
     T.rpm=cl(T.rpm,0,30000);T.max_rpm=cl(T.max_rpm,0,30000);
     T.lat_g=cl(T.lat_g,-4,4);T.long_g=cl(T.long_g,-4,4);
-    T.drift_deg=cl(T.drift_deg,-90,90);
+    T.drift_deg=cl(T.drift_deg,-180,180);
     snapPush(T);
     const b=$('mode');
     if(!T.alive){b.textContent='대기';b.className='badge off';}
@@ -1078,7 +1098,7 @@ function applyState(js){
   }catch(e){}
 }
 function connLost(){
-  if(++fails>=3){T.alive=false;
+  if(++fails>=3){T.alive=false;snapPush(T);   /* 마지막 값 동결 방지 */
     const b=$('mode');b.textContent='연결 끊김';b.className='badge lost';}
 }
 /* 중앙 푸시(SSE): 서버가 모든 창에 같은 프레임을 동시에 보낸다 —
@@ -1102,18 +1122,23 @@ function startStream(){
     if(esrc&&esrc.readyState===2){esrc=null;startPolling();}};
 }
 poll(); startStream();
+document.addEventListener('visibilitychange',()=>{   /* 복귀 시 추정기 초기화 */
+  if(!document.hidden){pollAt=0;pollDt=esrc?40:150;}
+});
 
-let lastRender=0,prevTs=null,spdSum=0,spdT=0,spdMax=0,trip=0;
+let lastRender=0,prevTs=null,lastTs=null,spdSum=0,spdT=0,spdMax=0,trip=0;
 function render(ts){
   _frame++;                       /* css() 캐시 무효화 키 */
   lastRender=performance.now();
+  /* 시각 스무딩용 dt와 적분용 dt 분리: 창이 가려지면 프레임이 1Hz로 떨어지는데
+     0.1s 상한을 그대로 쓰면 트립/평균속도가 실제의 10%만 쌓인다 */
   const dt=prevTs===null?1/60:Math.min(0.1,Math.max(0.001,(ts-prevTs)/1000));
   prevTs=ts;
   const k=1-Math.exp(-dt*9);
   for(const key in D)if(!isFinite(D[key]))D[key]=0;  // 오염 복구
   D.speed=Math.min(600,Math.max(0,D.speed));D.ratio=Math.min(1.5,Math.max(0,D.ratio));
   D.rpm=Math.min(30000,Math.max(0,D.rpm));
-  D.drift=Math.min(90,Math.max(-90,D.drift));D.latg=Math.min(4,Math.max(-4,D.latg));
+  D.drift=Math.min(180,Math.max(-180,D.drift));D.latg=Math.min(4,Math.max(-4,D.latg));
   D.longg=Math.min(4,Math.max(-4,D.longg));
   D.ratio+=((T.alive?T.ratio:0)-D.ratio)*k;
   D.rpm+=((T.alive?T.rpm:0)-D.rpm)*k;
@@ -1145,7 +1170,7 @@ function render(ts){
     $('gtSarc').setAttribute('stroke-dasharray',`${sv/3} 100`);
     $('gtSng').style.transform=`rotate(${-120+sv/300*240}deg)`;
     $('gtSpd').textContent=Math.round(D.speed);
-    if(T.alive&&D.speed>1){spdSum+=D.speed*dt;spdT+=dt;
+    if(T.alive&&D.speed>1){spdSum+=D.speed*rdt;spdT+=rdt;
       spdMax=Math.max(spdMax,D.speed);}
     $('gtAvg').textContent=spdT>3?Math.round(spdSum/spdT):'-';
     $('gtMax').textContent=spdMax>1?Math.round(spdMax):'-';
@@ -1164,6 +1189,9 @@ function render(ts){
     $('dneedle').style.transform=`rotate(${clamp(D.drift)/60*75}deg)`;
     $('dghost').style.transform=`rotate(${clamp(peak*peakSign)/60*75}deg)`;
     $('dghost').style.opacity=peak>=10?.55:0;
+    const gw=$('driftGWrap');
+    if(gw){gw.classList.toggle('sweet',ad>=20&&ad<=50);
+      gw.classList.toggle('over',ad>65);}
     $('gval').textContent=Math.abs(D.latg).toFixed(1);
     $('gdot').style.left=(50+Math.max(-1,Math.min(1,D.latg/2))*46)+'%';
   }
@@ -1175,7 +1203,9 @@ function render(ts){
     $('gvT').style.opacity=Math.max(0,Math.min(1,(-D.longg-0.35)/1.1))*.45;
     $('gvB').style.opacity=Math.max(0,Math.min(1,(D.longg-0.3)/1.2))*.3;
   }
-  if(T.alive)trip+=D.speed/3.6*dt/1000;   /* km */
+  const rdt=prevTs===null?1/60:Math.min(2,Math.max(0.001,(ts-lastTs)/1000));
+  lastTs=ts;
+  if(T.alive)trip+=D.speed/3.6*rdt/1000;   /* km — 실경과 기준 */
   driftScore(dt);
   sampleAndDraw(ts);
   /* rev 바 (바깥->중앙) */
@@ -1206,8 +1236,8 @@ function render(ts){
 const BUF=[];let lastSample=0,maxG=0,holdStart=null,holdBest=0;
 function cv(id){const c=$(id);if(!c)return null;
   const r=c.getBoundingClientRect(),dpr=devicePixelRatio||1;
-  if(c.width!==Math.round(r.width*dpr)){c.width=Math.round(r.width*dpr);
-    c.height=Math.round(r.height*dpr);}
+  const cw=Math.round(r.width*dpr),ch=Math.round(r.height*dpr);
+  if(c.width!==cw||c.height!==ch){c.width=cw;c.height=ch;}
   const g=c.getContext('2d');g.setTransform(c.width/r.width,0,0,c.height/r.height,0,0);
   return {g,w:r.width,h:r.height};}
 let _cssMap=null,_cssStamp=-1,_cssComputed=null,_frame=0;
@@ -1246,7 +1276,8 @@ function sampleAndDraw(ts){
 /* ===== 드리프트 스코어러 (FH 스킬체인 x FD 판정 하이브리드) =====
    누적: |각도|xspeedxdt, 콤보 배수 1.0~5.0 (지속 +0.1/s, 트랜지션 +0.5)
    무효화: 스핀(>90도) / 언더스티어(전륜슬립>후륜, 1s) / 직진 2s */
-let dsRun=0,dsMul=1,dsBank=0,dsBest=+(localStorage.getItem('rs50-dsbest')||0);
+let dsRun=0,dsMul=1,dsBank=0,
+    dsBest=+(localStorage.getItem('rs50-dsbest-run')||0);  /* 단일 런 최고 */
 let dsStraight=0,dsUnder=0,dsSign=0,dsTier=0,dsDirty=false;
 const TIERS=[[2000,'NICE','var(--grn)'],[6000,'GREAT','var(--acc)'],
   [12000,'AWESOME','var(--amb)'],[20000,'ULTIMATE','var(--pur)']];
@@ -1263,7 +1294,7 @@ function driftScore(dt){
   const active=T.alive&&ang>10&&spd>30;
   /* 무효 판정 */
   if(T.alive&&frontSlip>rearSlip+0.3&&ang>10)dsUnder+=dt;else dsUnder=0;
-  const spin=ang>90;
+  const spin=ang>100;   /* 이제 실제로 도달 가능 */
   dsDirty=dsUnder>1||spin;
   if(active&&!dsDirty){
     dsRun+=ang*spd*dt*0.02*dsMul;
@@ -1277,19 +1308,20 @@ function driftScore(dt){
     dsStraight+=dt;
     if(dsRun>0&&(dsStraight>2||dsDirty)){    /* 정산 */
       if(!dsDirty){
+        if(dsRun>dsBest){dsBest=dsRun;   /* 기록 = 한 번의 최고 드리프트 */
+          localStorage.setItem('rs50-dsbest-run',Math.round(dsBest));}
         dsBank+=dsRun;
-        if(dsBank>dsBest){dsBest=dsBank;
-          localStorage.setItem('rs50-dsbest',Math.round(dsBest));}
       }else callout('DIRTY','var(--red)');
-      dsRun=0;dsMul=1;dsSign=0;dsTier=0;dsUnder=0;
+      dsRun=0;dsMul=1;dsSign=0;dsTier=0;   /* dsUnder는 물리조건이 풀릴 때만 0 */
     }
   }
   const el=$('dscore');if(!el)return;
   el.classList.toggle('idle',dsRun<1);
   el.classList.toggle('dirty',dsDirty&&dsRun>0);
-  $('dsVal').textContent=Math.round(dsRun||dsBank);
+  const kfmt=v=>v>=10000?(v/1000).toFixed(1)+'k':String(Math.round(v));
+  $('dsVal').textContent=kfmt(dsRun||dsBank);
   $('dsMul').textContent=(dsRun>0?'x'+dsMul.toFixed(1)
-    :'BANK '+Math.round(dsBank)+' / BEST '+Math.round(dsBest));
+    :'BANK '+kfmt(dsBank)+String.fromCharCode(10)+'BEST '+kfmt(dsBest));
 }
 
 function drawFlame(id,ts){
@@ -1337,7 +1369,8 @@ function drawFlame(id,ts){
 function drawTires(){
   for(const wn of ['fl','fr','rl','rr']){
     const t=SM['t_'+wn]||0;
-    const tc=t<60?'var(--blu)':(t<95?'var(--grn)':(t<110?'var(--amb)':'var(--red)'));
+    /* 숫자색과 바색을 하나의 임계 함수에서 파생 (표기 충돌 방지) */
+    const tc=t<70?'var(--blu)':(t<85?'var(--grn)':(t<95?'var(--amb)':'var(--red)'));
     const tt=$('tt_'+wn);tt.textContent=Math.round(t)+'°';tt.style.color=tc;
     const cs=Math.min(3,SM['c_'+wn]||0);
     const sc=cs<1?'var(--grn)':(cs<2?'var(--amb)':'var(--red)');
@@ -1384,8 +1417,13 @@ function drawGG(){
   }
   g.globalAlpha=1;
   {
+    /* 현재점: 큰 흰 원 + 글로우 (작은 점은 주변시에서 안 보임) */
+    const px=cx+D.latg*scale,py=cy-D.longg*scale;
+    g.save();
+    g.shadowColor=css('--acc');g.shadowBlur=22;
     g.fillStyle=css('--tx');
-    g.beginPath();g.arc(cx+D.latg*scale,cy-D.longg*scale,9,0,7);g.fill();
+    g.beginPath();g.arc(px,py,Math.max(9,R*0.055),0,7);g.fill();
+    g.restore();
     /* 중앙 G값 대형 표기 (BMW M 방식) — 프레임당 라이브 스무딩값 */
     const cur=Math.hypot(D.latg,D.longg);
     g.font=`200 ${Math.round(R*0.4)}px ${NF()}`;
@@ -1411,15 +1449,26 @@ function drawMap(){
   const sy=p=>h-pad-((p.pz-z0)/span)*(h-2*pad);
   const now=performance.now();
   g.lineCap='round';
+  /* 각도 6단계 x 나이 4단계 버킷 (점당 1스트로크 -> 최대 24스트로크) */
+  const KB=6,AB=4,mb=new Map();
   for(let i=1;i<pts.length;i++){
-    const age=(now-pts[i].t)/20000;
-    g.globalAlpha=Math.max(0.05,0.9*(1-age));
-    /* 드리프트각으로 색칠: 그립(파랑)->한계(빨강), 각 클수록 굵게 */
-    const k=Math.min(1,(pts[i].dr||0)/45);
-    g.strokeStyle=`hsl(${200-200*k},95%,${55+15*k}%)`;
-    g.lineWidth=2+k*2.5;
-    g.beginPath();g.moveTo(sx(pts[i-1]),sy(pts[i-1]));
-    g.lineTo(sx(pts[i]),sy(pts[i]));g.stroke();}
+    const k=Math.min(KB-1,Math.floor(Math.min(1,(pts[i].dr||0)/45)*KB));
+    const a=Math.min(AB-1,Math.floor(Math.min(1,(now-pts[i].t)/20000)*AB));
+    const key=k*AB+a;let arr=mb.get(key);
+    if(!arr)mb.set(key,arr=[]);
+    arr.push(i);
+  }
+  for(const [key,seg] of mb){
+    const k=Math.floor(key/AB),a=key%AB,kf=(k+0.5)/KB;
+    g.strokeStyle=`hsl(${200-200*kf},95%,${55+15*kf}%)`;
+    g.lineWidth=2+kf*2.5;
+    g.globalAlpha=Math.max(0.05,0.9*(1-(a+0.5)/AB));
+    g.beginPath();
+    for(const i of seg){
+      g.moveTo(sx(pts[i-1]),sy(pts[i-1]));g.lineTo(sx(pts[i]),sy(pts[i]));
+    }
+    g.stroke();
+  }
   g.globalAlpha=1;
   const lp={px:SM.px||0,pz:SM.pz||0};
   g.fillStyle=css('--tx');
@@ -1539,6 +1588,7 @@ body{background:var(--bg);color:var(--tx);display:flex;align-items:center;
 <script>
 const $=id=>document.getElementById(id);
 const BUS=('BroadcastChannel' in window)?new BroadcastChannel('rs50-cfg'):null;
+const SETTERS={};
 function buildSwitch(navId,items,dataKey,storeKey,defval){
   const nav=$(navId);
   const cur=(()=>{const v=localStorage.getItem(storeKey);
@@ -1554,6 +1604,11 @@ function buildSwitch(navId,items,dataKey,storeKey,defval){
     b.classList.toggle('on',key===cur);
     nav.appendChild(b);
   });
+  SETTERS[dataKey]=v=>{                     /* 외부 변경 수신 시 하이라이트 동기 */
+    if(!items.some(([k])=>k===v))return;
+    localStorage.setItem(storeKey,v);
+    [...nav.children].forEach(x=>x.classList.toggle('on',x.dataset.v===v));
+  };
 }
 buildSwitch('themes',[['pit','PIT'],['gt','GT'],['f1','F1'],['retro','RETRO'],
   ['minimal','OLED'],['neon','NEON'],['classic','CLASSIC'],['vfd','VFD']],
@@ -1571,7 +1626,10 @@ buildSwitch('gfxsw',[['on','GFX'],['off','GFX✕']],'gfx','rs50-gfx','on');
 /* 연결 표시: 핑에 응답한 화면을 점등 */
 const seen={};
 if(BUS){
-  BUS.onmessage=e=>{const d=e.data||{};if(d.pong)seen[d.pong]=Date.now();};
+  BUS.onmessage=e=>{const d=e.data||{};
+    if(d.pong){seen[d.pong]=Date.now();return;}
+    if(d.key&&SETTERS[d.key])SETTERS[d.key](d.value);  /* 다른 창의 변경 반영 */
+  };
   setInterval(()=>{
     BUS.postMessage({ping:1});
     const now=Date.now();
@@ -1603,7 +1661,72 @@ def _sanitize(d):
 
 _ASSETS = Path(__file__).resolve().parent.parent / "assets" / "fonts"
 _FONT_FILES = {"Michroma-Regular.ttf", "Orbitron-VariableFont_wght.ttf"}
-_STREAM_DT = 1 / 30  # SSE 푸시 주기 (모든 창 공통 프레임)
+_STREAM_DT = 1 / 30   # SSE 푸시 주기
+_NL2 = bytes([10, 10])   # SSE 이벤트 구분자
+_MAX_STREAMS = 8      # 동시 스트림 상한 (좀비 연결이 브라우저 연결한도를 잠식하지 않게)
+
+
+class _Broadcaster:
+    """30Hz로 프레임을 한 번만 만들어 모든 스트림이 동일 프레임을 쓰게 한다.
+
+    접속마다 독립 루프를 돌리면 창끼리 샘플 시각이 어긋난다(최대 33ms).
+    생산자 1개 + 조건변수로 깨우기 -> 모든 창이 같은 payload를 받는다.
+    """
+
+    def __init__(self, provider, log=print):
+        self.provider = provider
+        self.log = log
+        self.cv = threading.Condition()
+        self.seq = 0
+        self.payload = b"{}"
+        self.clients = 0
+        self._thread = None
+        self._err_at = 0.0
+
+    def _run(self):
+        while True:
+            with self.cv:
+                if self.clients <= 0:      # 구독자가 없으면 생산 중단
+                    self._thread = None
+                    return
+            try:
+                payload = json.dumps(_sanitize(self.provider())).encode()
+            except Exception as e:         # 생산 실패를 조용히 삼키지 않는다
+                now = time.time()
+                if now - self._err_at > 5:
+                    self._err_at = now
+                    self.log(f"[web] 상태 생성 실패(스트림 유지): {e}")
+                time.sleep(_STREAM_DT)
+                continue
+            with self.cv:
+                self.payload = payload
+                self.seq += 1
+                self.cv.notify_all()
+            time.sleep(_STREAM_DT)
+
+    def subscribe(self):
+        with self.cv:
+            if self.clients >= _MAX_STREAMS:
+                return False
+            self.clients += 1
+            if self._thread is None:
+                self._thread = threading.Thread(target=self._run, daemon=True,
+                                                name="sse-broadcast")
+                self._thread.start()
+        return True
+
+    def unsubscribe(self):
+        with self.cv:
+            self.clients = max(0, self.clients - 1)
+
+    def wait(self, last_seq, timeout=2.0):
+        """다음 프레임 대기 -> (seq, payload), 타임아웃 시 (last_seq, None)"""
+        with self.cv:
+            if self.seq == last_seq:
+                self.cv.wait(timeout)
+            if self.seq == last_seq:
+                return last_seq, None
+            return self.seq, self.payload
 
 
 class WebUI(threading.Thread):
@@ -1617,6 +1740,7 @@ class WebUI(threading.Thread):
 
     def run(self):
         provider = self.provider
+        bcast = _Broadcaster(provider, log=self.log)
 
         class Handler(BaseHTTPRequestHandler):
             protocol_version = "HTTP/1.1"  # keep-alive (150ms 폴링 TCP 재접속 방지)
@@ -1655,22 +1779,35 @@ class WebUI(threading.Thread):
                     body = _side_page(path[1:]).encode()
                     ctype = "text/html; charset=utf-8"
                 elif path == "/events":
-                    # 중앙 푸시: 접속한 모든 창에 같은 프레임을 동시에 전송
+                    # 중앙 푸시: 브로드캐스터가 만든 "같은 프레임"을 모든 창에 전송
+                    if not bcast.subscribe():
+                        self.send_response(503)
+                        self.send_header("Content-Length", "0")
+                        self.end_headers()
+                        return
                     self.send_response(200)
                     self.send_header("Content-Type", "text/event-stream")
                     self.send_header("Cache-Control", "no-store")
                     self.send_header("Connection", "close")
                     self.end_headers()
                     self.close_connection = True
+                    try:       # 좀비 연결이 스레드를 영구 점유하지 않도록
+                        self.connection.settimeout(10)
+                    except Exception:
+                        pass
+                    seq = 0
                     try:
                         while True:
-                            payload = json.dumps(_sanitize(provider()))
-                            self.wfile.write(b"data: " + payload.encode()
-                                             + b"\n\n")
+                            seq, payload = bcast.wait(seq)
+                            if payload is None:
+                                self.wfile.write(b": keepalive" + _NL2)
+                            else:
+                                self.wfile.write(b"data: " + payload + _NL2)
                             self.wfile.flush()
-                            time.sleep(_STREAM_DT)
                     except Exception:
-                        pass  # 창을 닫으면 파이프가 끊긴다 (정상 종료)
+                        pass   # 창을 닫으면 파이프가 끊긴다 (정상 종료)
+                    finally:
+                        bcast.unsubscribe()
                     return
                 elif path == "/config":
                     body = CONFIG_TMPL.encode()

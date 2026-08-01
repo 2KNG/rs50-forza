@@ -130,7 +130,9 @@ class TelemetryState:
         import math
         if self.speed < 5.0:
             return 0.0
-        return math.degrees(math.atan2(self.vel_x, max(0.1, abs(self.vel_z))))
+        # abs(vel_z)를 쓰면 각이 (-90,90)에 갇혀 스핀(후진 방향)을 표현할 수 없다.
+        # 전 범위(±180)를 그대로 내보내고 소비측에서 판단한다.
+        return math.degrees(math.atan2(self.vel_x, self.vel_z))
 
 
 class TelemetryListener(threading.Thread):
