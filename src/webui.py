@@ -1105,6 +1105,7 @@ poll(); startStream();
 
 let lastRender=0,prevTs=null,spdSum=0,spdT=0,spdMax=0,trip=0;
 function render(ts){
+  _frame++;                       /* css() 캐시 무효화 키 */
   lastRender=performance.now();
   const dt=prevTs===null?1/60:Math.min(0.1,Math.max(0.001,(ts-prevTs)/1000));
   prevTs=ts;
@@ -1184,7 +1185,8 @@ function render(ts){
   const lit=D.ratio<=T.start_ratio?0:
     Math.min(N,Math.max(1,Math.round((D.ratio-T.start_ratio)/(T.blink_ratio-T.start_ratio)*N)));
   const SC=T.seg_colors&&T.seg_colors.ltr;
-  segs.forEach((el,i)=>{
+  segs.forEach((el,idx)=>{
+    const i=idx%N;                /* 상/하단 바가 각각 0..N-1 로 점등되도록 */
     if(over){const c=(T.seg_colors&&T.seg_colors.blink)||'var(--pur)';
       if(blinkOn){el.style.background=c;
         el.style.boxShadow=`0 0 14px ${c},0 0 34px ${c}`;}
@@ -1208,7 +1210,14 @@ function cv(id){const c=$(id);if(!c)return null;
     c.height=Math.round(r.height*dpr);}
   const g=c.getContext('2d');g.setTransform(c.width/r.width,0,0,c.height/r.height,0,0);
   return {g,w:r.width,h:r.height};}
-function css(v){return getComputedStyle(document.body).getPropertyValue(v).trim();}
+let _cssMap=null,_cssStamp=-1,_cssComputed=null,_frame=0;
+function css(v){                  /* 프레임당 1회만 getComputedStyle */
+  if(_cssStamp!==_frame){_cssMap={};_cssStamp=_frame;
+    _cssComputed=getComputedStyle(document.body);}
+  let r=_cssMap[v];
+  if(r===undefined)r=_cssMap[v]=_cssComputed.getPropertyValue(v).trim();
+  return r;
+}
 function NF(){return css('--numfont')||"'Segoe UI'";}
 
 function sampleAndDraw(ts){
@@ -1342,6 +1351,7 @@ function drawGG(){
   const c=cv('gg');if(!c)return;const{g,w,h}=c;
   g.clearRect(0,0,w,h);
   const cx=w/2,cy=h/2,R=Math.min(w,h)/2-10,scale=R/2;
+  if(!(R>6))return;              /* 레이아웃 전/최소화 시 음수 반지름 방지 */
   /* M 스타일: 1G 강조 링 + 크로스헤어 */
   g.strokeStyle=css('--line');g.lineWidth=1;
   for(const gr of [0.5,1.5]){g.beginPath();g.arc(cx,cy,gr*scale,0,7);g.stroke();}
@@ -1356,12 +1366,22 @@ function drawGG(){
   g.fillText('1G',cx+scale-16,cy-6);g.fillText('2G',cx+2*scale-24,cy-6);
   const now=performance.now(),acc=css('--acc');
   g.lineWidth=3;g.lineCap='round';g.lineJoin='round';g.strokeStyle=acc;
+  /* 4K에서 점당 1스트로크는 비용이 크다 -> 나이 8단계로 묶어 8스트로크 */
+  const NB=8,bins=Array.from({length:NB},()=>[]);
   for(let i=1;i<BUF.length;i++){
-    const age=(now-BUF[i].t)/20000;
-    g.globalAlpha=Math.max(0,0.85*(1-age));
+    const age=Math.min(1,(now-BUF[i].t)/20000);
+    bins[Math.min(NB-1,Math.floor(age*NB))].push(i);
+  }
+  for(let b=0;b<NB;b++){
+    const seg=bins[b];if(!seg.length)continue;
+    g.globalAlpha=Math.max(0.04,0.85*(1-(b+0.5)/NB));
     g.beginPath();
-    g.moveTo(cx+BUF[i-1].lg*scale,cy-BUF[i-1].gg*scale);
-    g.lineTo(cx+BUF[i].lg*scale,cy-BUF[i].gg*scale);g.stroke();}
+    for(const i of seg){
+      g.moveTo(cx+BUF[i-1].lg*scale,cy-BUF[i-1].gg*scale);
+      g.lineTo(cx+BUF[i].lg*scale,cy-BUF[i].gg*scale);
+    }
+    g.stroke();
+  }
   g.globalAlpha=1;
   {
     g.fillStyle=css('--tx');
@@ -1438,9 +1458,15 @@ function drawTrace(){
   g.fillStyle=css('--dim');g.fillText('STEER',118,14);g.fillStyle=css('--acc');g.fillRect(160,7,14,3);
 }
 
-function loop(ts){render(ts);requestAnimationFrame(loop);}
+function loop(ts){
+  try{render(ts);}catch(e){                    /* 한 프레임 실패가 루프를 죽이지 않게 */
+    if(!loop.warned){loop.warned=1;console.warn('render 오류(계속 진행):',e);}
+  }
+  requestAnimationFrame(loop);
+}
 requestAnimationFrame(loop);
-setInterval(()=>{if(performance.now()-lastRender>200)render(performance.now());},250);
+setInterval(()=>{if(performance.now()-lastRender>200){
+  try{render(performance.now());}catch(e){}}},250);
 </script></body></html>"""
 
 
