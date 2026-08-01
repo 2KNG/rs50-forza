@@ -424,7 +424,7 @@ main{flex:1;min-height:0;display:grid;gap:calc(var(--u)*1.2)}
 body[data-side=left] main{grid-template-columns:1fr 1fr;grid-template-rows:1fr}
 body[data-side=right] main{grid-template-columns:1fr 1fr;
   grid-template-rows:1fr auto auto}
-.cell{min-height:0;min-width:0;display:flex;flex-direction:column;
+.cell{position:relative;min-height:0;min-width:0;display:flex;flex-direction:column;
   align-items:stretch;justify-content:center;gap:calc(var(--u)*.8)}
 .sq{position:relative;flex:1 1 0;width:100%;min-height:0;min-width:0}
 .sq svg,.sq canvas{position:absolute;inset:0;width:100%;height:100%}
@@ -496,6 +496,26 @@ canvas.widget{background:var(--panel);border:1px solid var(--line);
 .tbar{position:relative;height:calc(var(--u)*.9);background:var(--seg-off);
   border-radius:calc(var(--u)*.45);overflow:hidden}
 .tbar div{position:absolute;left:0;top:0;bottom:0;border-radius:inherit}
+.dscore{position:absolute;left:calc(var(--u)*2.4);top:calc(var(--u)*1.8);
+  text-align:left;pointer-events:none;z-index:2}
+.dscore .sv{font-family:var(--numfont);font-size:calc(var(--u)*5.2);
+  font-weight:800;line-height:1;color:var(--tx);
+  font-variant-numeric:tabular-nums;text-shadow:0 0 calc(var(--u)*1.2) var(--acc)}
+.dscore .mx{font-family:var(--numfont);font-size:calc(var(--u)*2.6);
+  font-weight:800;color:var(--amb);letter-spacing:1px}
+.dscore.idle{opacity:.35}
+.dscore.dirty .sv{color:var(--red);text-shadow:none}
+#callout{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%);
+  z-index:7;pointer-events:none;font-family:var(--numfont);font-weight:800;
+  font-size:calc(var(--u)*7);letter-spacing:calc(var(--u)*.3);opacity:0;
+  white-space:nowrap;text-shadow:0 0 calc(var(--u)*2.5) currentColor}
+#callout.go{animation:calloutPop 1.5s cubic-bezier(.14,.9,.3,1) forwards}
+@keyframes calloutPop{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(.6)}
+  18%{opacity:1;transform:translate(-50%,-50%) scale(1.12)}
+  30%{transform:translate(-50%,-50%) scale(1)}
+  72%{opacity:1}
+  100%{opacity:0;transform:translate(-50%,-52%) scale(1.04)}}
 .score{display:flex;gap:calc(var(--u)*2.2);font-size:calc(var(--u)*1.5);
   color:var(--dim);font-variant-numeric:tabular-nums;align-items:baseline}
 .score b{color:var(--acc);font-size:calc(var(--u)*2.2)}
@@ -594,6 +614,7 @@ body[data-theme=gt] .panel{border-radius:calc(var(--u)*1.6)}
 <div id="flash"></div>
 <div class="gv" id="gvL"></div><div class="gv" id="gvR"></div>
 <div class="gv" id="gvT"></div><div class="gv" id="gvB"></div>
+<div id="callout"></div>
 <div class="top">
   <span class="brand">RS50 · __LABEL__</span>
   <span class="badge off" id="mode">대기</span><span class="dot" id="teldot"></span>
@@ -832,6 +853,10 @@ if(SIDE==='left'){
 }else{
   $('main').innerHTML=`
     <div class="cell">
+    <div class="dscore idle" id="dscore">
+      <div class="sv" id="dsVal">0</div>
+      <div class="mx" id="dsMul">x1.0</div>
+    </div>
     <div class="gauge panel ana sq" id="driftGWrap" style="padding:calc(var(--u)*1)">
       <svg viewBox="0 0 240 150">
         <g id="dticks"></g>
@@ -1016,6 +1041,7 @@ function render(ts){
     $('gvB').style.opacity=Math.max(0,Math.min(1,(D.longg-0.3)/1.2))*.3;
   }
   if(T.alive)trip+=D.speed/3.6*dt/1000;   /* km */
+  driftScore(dt);
   sampleAndDraw(ts);
   /* rev 바 (바깥->중앙) */
   const over=T.alive&&T.ratio>=T.blink_ratio;
@@ -1072,6 +1098,55 @@ function sampleAndDraw(ts){
     $('sG').textContent=maxG.toFixed(1);
     $('sHold').textContent=holdBest.toFixed(1);
     $('sTrip').textContent=trip.toFixed(1);}
+}
+
+/* ===== 드리프트 스코어러 (FH 스킬체인 x FD 판정 하이브리드) =====
+   누적: |각도|xspeedxdt, 콤보 배수 1.0~5.0 (지속 +0.1/s, 트랜지션 +0.5)
+   무효화: 스핀(>90도) / 언더스티어(전륜슬립>후륜, 1s) / 직진 2s */
+let dsRun=0,dsMul=1,dsBank=0,dsBest=+(localStorage.getItem('rs50-dsbest')||0);
+let dsStraight=0,dsUnder=0,dsSign=0,dsTier=0,dsDirty=false;
+const TIERS=[[2000,'NICE','var(--grn)'],[6000,'GREAT','var(--acc)'],
+  [12000,'AWESOME','var(--amb)'],[20000,'ULTIMATE','var(--pur)']];
+function callout(txt,color){
+  const el=$('callout');if(!el)return;
+  el.textContent=txt;el.style.color=color;
+  el.classList.remove('go');void el.offsetWidth;el.classList.add('go');
+}
+function driftScore(dt){
+  if(SIDE!=='right')return;
+  const ang=Math.abs(D.drift),spd=D.speed,W=T.wheels||{};
+  const rearSlip=Math.max((W.rl&&W.rl.combined)||0,(W.rr&&W.rr.combined)||0);
+  const frontSlip=Math.max((W.fl&&W.fl.combined)||0,(W.fr&&W.fr.combined)||0);
+  const active=T.alive&&ang>10&&spd>30;
+  /* 무효 판정 */
+  if(T.alive&&frontSlip>rearSlip+0.3&&ang>10)dsUnder+=dt;else dsUnder=0;
+  const spin=ang>90;
+  dsDirty=dsUnder>1||spin;
+  if(active&&!dsDirty){
+    dsRun+=ang*spd*dt*0.02*dsMul;
+    dsMul=Math.min(5,dsMul+dt*0.1);
+    const sg=D.drift<0?-1:1;                 /* 트랜지션 보너스 */
+    if(dsSign&&sg!==dsSign)dsMul=Math.min(5,dsMul+0.5);
+    dsSign=sg;dsStraight=0;
+    for(let i=dsTier;i<TIERS.length;i++)
+      if(dsRun>=TIERS[i][0]){callout(TIERS[i][1],TIERS[i][2]);dsTier=i+1;}
+  }else{
+    dsStraight+=dt;
+    if(dsRun>0&&(dsStraight>2||dsDirty)){    /* 정산 */
+      if(!dsDirty){
+        dsBank+=dsRun;
+        if(dsBank>dsBest){dsBest=dsBank;
+          localStorage.setItem('rs50-dsbest',Math.round(dsBest));}
+      }else callout('DIRTY','var(--red)');
+      dsRun=0;dsMul=1;dsSign=0;dsTier=0;dsUnder=0;
+    }
+  }
+  const el=$('dscore');if(!el)return;
+  el.classList.toggle('idle',dsRun<1);
+  el.classList.toggle('dirty',dsDirty&&dsRun>0);
+  $('dsVal').textContent=Math.round(dsRun||dsBank);
+  $('dsMul').textContent=(dsRun>0?'x'+dsMul.toFixed(1)
+    :'BANK '+Math.round(dsBank)+' / BEST '+Math.round(dsBest));
 }
 
 function drawFlame(id,ts){
