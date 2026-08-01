@@ -639,10 +639,12 @@ body[data-numfont=black] #speed,body[data-numfont=black] #spdTxt
 .gear-ghost{position:fixed;pointer-events:none;z-index:6;
   display:flex;align-items:center;justify-content:center;
   font-weight:800;font-family:var(--numfont);line-height:1;
-  animation:gearGhost .42s cubic-bezier(.16,.84,.44,1) forwards;
+  animation:gearGhost .5s cubic-bezier(.16,.84,.44,1) forwards;
   text-shadow:0 0 calc(var(--u)*2) currentColor}
-@keyframes gearGhost{from{transform:scale(1);opacity:.9}
-  to{transform:scale(2.1);opacity:0}}
+@keyframes gearGhost{
+  0%{transform:scale(.72);opacity:0}
+  22%{transform:scale(1.06);opacity:.95}
+  100%{transform:scale(2.3);opacity:0}}
 #speed,#gear,#gearA,#spdTxt,#drift,#driftA,#dpeak,#dpeakA,#gval,
 #rpm,#maxrpm,#ratio,.tire .tt,.score b,.sub b,
 #gtTt text,#gtSt text,#gtGear,#gtSpd,#gtTpct,#gtAvg,#gtMax,
@@ -738,7 +740,7 @@ function gearFx(el,val){
   const cs=getComputedStyle(el);
   gh.style.color=(el instanceof SVGElement)?cs.fill:cs.color;
   document.body.appendChild(gh);
-  setTimeout(()=>gh.remove(),460);
+  setTimeout(()=>gh.remove(),540);
 }
 
 /* 설정은 전역(좌/우 공유) — BroadcastChannel로 다른 창에 즉시 반영 */
@@ -1084,8 +1086,10 @@ function applyState(js){
     if(SIDE==='left'){
       const g=T.gear===0?'R':(T.gear>10?'N':(T.gear||'-'));
       if(g!==lastGear){
-        if(lastGear!==null&&lastGear!=='-')
-          for(const id of ['gear','gearA','gtGear'])gearFx($(id),lastGear);
+        $('gear').textContent=g;$('gearA').textContent=g;
+        const gt=$('gtGear');if(gt)gt.textContent=g;
+        if(lastGear!==null)          /* 새 기어 숫자가 커지며 퍼지는 이펙트 */
+          for(const id of ['gear','gearA','gtGear'])gearFx($(id),g);
         for(const id of ['gear','gearA']){const el=$(id);
           el.classList.add('pop');setTimeout(()=>el.classList.remove('pop'),140);}
         lastGear=g;}
