@@ -408,7 +408,8 @@ body[data-gfx=off] .gv{display:none}
 #flash{position:fixed;inset:0;pointer-events:none;z-index:1;opacity:0;
   box-shadow:inset 0 0 calc(var(--u)*5) calc(var(--u)*.8) var(--pur);
   transition:opacity .08s}
-.top{display:flex;align-items:center;gap:calc(var(--u)*1);flex-wrap:wrap}
+.top{display:flex;align-items:center;gap:calc(var(--u)*.8);flex-wrap:wrap;
+  flex:0 0 auto;opacity:.85}
 .brand{font-weight:800;letter-spacing:3px;font-size:calc(var(--u)*1.3);color:var(--dim)}
 .dot{width:calc(var(--u)*.9);height:calc(var(--u)*.9);border-radius:50%;background:#444}
 .dot.on{background:var(--grn);box-shadow:0 0 calc(var(--u)*1) var(--grn)}
@@ -685,9 +686,7 @@ body[data-theme=vfd] .tick{stroke:var(--gauge-dim);opacity:.85}
 <div class="gv" id="gvT"></div><div class="gv" id="gvB"></div>
 <div id="callout"></div>
 <div class="top">
-  <span class="brand">RS50 · __LABEL__</span>
   <span class="badge off" id="mode">대기</span><span class="dot" id="teldot"></span>
-  <button class="cfgbtn" id="cfgOpen">⚙ CONFIG</button>
 </div>
 <div class="cfgmask" id="cfgMask">
   <div class="cfgpanel" id="cfgPanel">
@@ -735,7 +734,9 @@ function gearFx(el,val){
 const SWREG={};
 const CFGBUS=('BroadcastChannel' in window)?new BroadcastChannel('rs50-cfg'):null;
 if(CFGBUS)CFGBUS.onmessage=e=>{
-  const{key,value}=e.data||{};const fn=SWREG[key];if(fn)fn(value,false);
+  const d=e.data||{};
+  if(d.ping){CFGBUS.postMessage({pong:SIDE});return;}
+  const fn=SWREG[d.key];if(fn)fn(d.value,false);
 };
 function buildSwitch(navId, items, dataKey, storeKey, defval, qsKey){
   const nav=$(navId);
@@ -759,7 +760,6 @@ function buildSwitch(navId, items, dataKey, storeKey, defval, qsKey){
 /* 설정창 열고 닫기 */
 function cfgSet(on){document.body.dataset.cfg=on?'on':'off';}
 if(new URLSearchParams(location.search).get('cfg')==='1')cfgSet(true);
-$('cfgOpen').onclick=()=>cfgSet(document.body.dataset.cfg!=='on');
 $('cfgClose').onclick=()=>cfgSet(false);
 $('cfgMask').onclick=e=>{if(e.target===$('cfgMask'))cfgSet(false);};
 addEventListener('keydown',e=>{
@@ -1014,12 +1014,34 @@ const segs=[...rev.children,...revB.children];
 /* ===== 데이터 엔진 (폴링 + 60fps 보간 + rAF 폴백) ===== */
 let T={ratio:0,alive:false,start_ratio:.5,blink_ratio:.9,seg_colors:null,events:[]};
 let D={ratio:0,rpm:0,speed:0,drift:0,latg:0,longg:0};
-/* 일반화 지수 스무더 — 채널별 반응속도(rate/s) 차등, NaN 방어 */
-const SM={};
-function sm(key,target,rate,dt){
-  if(!isFinite(target))target=0;
-  const v=isFinite(SM[key])?SM[key]:target;
-  return SM[key]=v+(target-v)*(1-Math.exp(-dt*rate));
+/* 스냅샷 보간 — 폴링(≈150ms) 간격에 맞춰 이전값→새값을 선형 이동.
+   지수 스무딩은 시정수 뒤 평탄해져 계단이 남지만, 이 방식은 다음 샘플이
+   올 때까지 계속 움직이므로 페달/조향 트레이스가 완전히 이어진다. */
+const SM={},PREV={},CUR={};
+let pollAt=0,pollDt=150;
+const CH=[['thr',t=>(t.accel||0)/255],['brk',t=>(t.brake||0)/255],
+  ['st',t=>(t.steer||0)/127],['hb',t=>(t.handbrake||0)/255],
+  ['px',t=>t.pos_x||0],['pz',t=>t.pos_z||0]];
+for(const wn of ['fl','fr','rl','rr']){
+  CH.push(['t_'+wn,t=>((t.wheels||{})[wn]||{}).temp_c||0]);
+  CH.push(['c_'+wn,t=>((t.wheels||{})[wn]||{}).combined||0]);
+  CH.push(['u_'+wn,t=>((t.wheels||{})[wn]||{}).sus||0]);
+}
+function snapPush(t){                    /* 폴 수신 시 1회 */
+  const now=performance.now();
+  if(pollAt)pollDt=pollDt*0.7+Math.min(400,Math.max(60,now-pollAt))*0.3;
+  pollAt=now;
+  for(const [k,f] of CH){
+    const v=f(t),nv=isFinite(v)?v:0;
+    PREV[k]=isFinite(SM[k])?SM[k]:nv;CUR[k]=nv;
+  }
+}
+function snapLerp(){                     /* 매 프레임 */
+  const a=pollAt?Math.min(1,(performance.now()-pollAt)/pollDt):1;
+  for(const [k] of CH){
+    const p=PREV[k]||0,c=CUR[k]||0;
+    SM[k]=p+(c-p)*a;
+  }
 }
 let lastGear=null,lastEvents='',fails=0,inflight=false,peak=0,peakTs=0,peakSign=1;
 const CLS=['D','C','B','A','S1','S2','X','X'];
@@ -1033,6 +1055,7 @@ async function poll(){
     T.rpm=cl(T.rpm,0,30000);T.max_rpm=cl(T.max_rpm,0,30000);
     T.lat_g=cl(T.lat_g,-4,4);T.long_g=cl(T.long_g,-4,4);
     T.drift_deg=cl(T.drift_deg,-90,90);
+    snapPush(T);
     const b=$('mode');
     if(!T.alive){b.textContent='대기';b.className='badge off';}
     else if(T.mode==='AUTO'){b.textContent='AUTO';b.className='badge auto';}
@@ -1076,14 +1099,7 @@ function render(ts){
   D.drift+=((T.alive?T.drift_deg:0)-D.drift)*k;
   D.latg+=((T.alive?T.lat_g:0)-D.latg)*k;
   D.longg+=((T.alive?T.long_g:0)-D.longg)*k;
-  /* 입력/타이어/좌표 — 150ms 틱 -> 프레임 보간 (빠른 채널일수록 rate 높게) */
-  sm('thr',(T.accel||0)/255,18,dt);sm('brk',(T.brake||0)/255,18,dt);
-  sm('st',(T.steer||0)/127,18,dt);sm('hb',(T.handbrake||0)/255,18,dt);
-  sm('px',T.pos_x||0,12,dt);sm('pz',T.pos_z||0,12,dt);
-  const WH=T.wheels||{};
-  for(const wn of ['fl','fr','rl','rr']){const d=WH[wn]||{};
-    sm('t_'+wn,d.temp_c||0,4,dt);sm('c_'+wn,d.combined||0,10,dt);
-    sm('u_'+wn,d.sus||0,14,dt);}
+  snapLerp();   /* 입력/타이어/좌표: 폴링 간격 스냅샷 보간 (계단 제거) */
 
   if(SIDE==='left'){
     $('speed').textContent=Math.round(D.speed);
@@ -1407,6 +1423,118 @@ setInterval(()=>{if(performance.now()-lastRender>200)render(performance.now());}
 </script></body></html>"""
 
 
+CONFIG_TMPL = r"""<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RS50 CONFIG</title>
+<style>
+@font-face{font-family:'Michroma';src:url('/fonts/Michroma-Regular.ttf') format('truetype')}
+@font-face{font-family:'Orbitron';font-weight:400 900;
+  src:url('/fonts/Orbitron-VariableFont_wght.ttf') format('truetype')}
+:root{--bg:#0b0e14;--panel:#141922;--line:#232b38;--tx:#e6edf3;
+  --dim:#8b98a9;--acc:#3b6cff;--grn:#2bd45f;--u:min(1.1vw,1.6vh)}
+*{margin:0;box-sizing:border-box;font-family:'Segoe UI',system-ui,sans-serif}
+html,body{height:100%}
+body{background:var(--bg);color:var(--tx);display:flex;align-items:center;
+  justify-content:center;padding:24px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;
+  padding:26px 30px;width:min(96vw,860px);max-height:96vh;overflow-y:auto;
+  box-shadow:0 18px 50px rgba(0,0,0,.5)}
+.head{display:flex;align-items:baseline;gap:14px;padding-bottom:14px;
+  margin-bottom:8px;border-bottom:1px solid var(--line)}
+.head b{font-size:24px;letter-spacing:5px}
+.head span{color:var(--dim);font-size:13px}
+.live{margin-left:auto;display:flex;gap:12px;font-size:12px;color:var(--dim);
+  letter-spacing:1px}
+.live i{font-style:normal;display:inline-flex;align-items:center;gap:5px}
+.live i::before{content:'';width:8px;height:8px;border-radius:50%;background:#39404d}
+.live i.on::before{background:var(--grn);box-shadow:0 0 8px var(--grn)}
+.row{display:flex;align-items:center;gap:16px;padding:11px 0;
+  border-bottom:1px solid rgba(255,255,255,.04)}
+.row>label{width:104px;flex:0 0 auto;color:var(--dim);font-size:13px;
+  letter-spacing:1px}
+.sw{display:flex;gap:7px;flex-wrap:wrap}
+.sw button{background:#1b212c;color:var(--dim);border:1px solid var(--line);
+  border-radius:9px;padding:8px 15px;font-size:13px;letter-spacing:1px;
+  cursor:pointer;transition:all .12s}
+.sw button:hover{color:var(--tx);border-color:#39404d}
+.sw button.on{color:#fff;border-color:var(--acc);background:#1b2740;
+  box-shadow:0 0 0 1px var(--acc)}
+#fontsw button[data-v=din]{font-family:Bahnschrift,sans-serif}
+#fontsw button[data-v=mono]{font-family:Consolas,monospace}
+#fontsw button[data-v=agency]{font-family:'Agency FB',sans-serif}
+#fontsw button[data-v=impact]{font-family:Impact,sans-serif}
+#fontsw button[data-v=black]{font-family:'Segoe UI Black',sans-serif}
+#fontsw button[data-v=euro]{font-family:'Michroma',sans-serif;font-size:11px}
+#fontsw button[data-v=orbit]{font-family:'Orbitron',sans-serif}
+.note{margin-top:16px;color:var(--dim);font-size:12px;line-height:1.75}
+.note code{background:#0f141d;padding:2px 7px;border-radius:5px;
+  font-family:Consolas,monospace;color:#a9b6c6}
+.note b{color:var(--tx)}
+</style></head>
+<body>
+<div class="panel">
+  <div class="head"><b>CONFIG</b><span>좌/우 화면에 즉시 적용</span>
+    <div class="live"><i id="lvL">LEFT</i><i id="lvR">RIGHT</i></div></div>
+  <div class="row"><label>테마</label><nav class="sw" id="themes"></nav></div>
+  <div class="row"><label>숫자 폰트</label><nav class="sw" id="fontsw"></nav></div>
+  <div class="row"><label>표시 모드</label><nav class="sw" id="displaysw"></nav></div>
+  <div class="row"><label>REV 바</label><nav class="sw" id="barsw"></nav></div>
+  <div class="row"><label>바 스타일</label><nav class="sw" id="fxsw"></nav></div>
+  <div class="row"><label>G 이펙트</label><nav class="sw" id="gfxsw"></nav></div>
+  <div class="note">
+    이 창은 켜둔 채 <b>Alt+Tab</b>으로 불러 쓰면 됩니다 —
+    대시보드 화면엔 아무 UI도 남기지 않습니다.<br>
+    새로 여는 창에도 적용됩니다. 직접 지정도 가능:
+    <code>/left?th=gt&amp;fn=din&amp;bar=both&amp;fx=flame&amp;dsp=analog</code>
+  </div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const BUS=('BroadcastChannel' in window)?new BroadcastChannel('rs50-cfg'):null;
+function buildSwitch(navId,items,dataKey,storeKey,defval){
+  const nav=$(navId);
+  const cur=(()=>{const v=localStorage.getItem(storeKey);
+    return items.some(([k])=>k===v)?v:defval;})();
+  items.forEach(([key,label])=>{
+    const b=document.createElement('button');
+    b.textContent=label;b.dataset.v=key;
+    b.onclick=()=>{
+      localStorage.setItem(storeKey,key);
+      [...nav.children].forEach(x=>x.classList.toggle('on',x.dataset.v===key));
+      if(BUS)BUS.postMessage({key:dataKey,value:key});
+    };
+    b.classList.toggle('on',key===cur);
+    nav.appendChild(b);
+  });
+}
+buildSwitch('themes',[['pit','PIT'],['gt','GT'],['f1','F1'],['retro','RETRO'],
+  ['minimal','OLED'],['neon','NEON'],['classic','CLASSIC'],['vfd','VFD']],
+  'theme','rs50-theme','pit');
+buildSwitch('fontsw',[['segoe','AA'],['din','DIN'],['mono','01'],['agency','AGY'],
+  ['impact','IMP'],['black','BLK'],['euro','EURO'],['orbit','ORBIT']],
+  'numfont','rs50-numfont','segoe');
+buildSwitch('displaysw',[['digital','DIG'],['analog','ANA']],
+  'display','rs50-display','analog');
+buildSwitch('barsw',[['top','BAR ▲'],['both','BAR ▲▼']],
+  'revpos','rs50-revpos','top');
+buildSwitch('fxsw',[['seg','SEG'],['flame','FIRE']],
+  'revstyle','rs50-revstyle','seg');
+buildSwitch('gfxsw',[['on','GFX'],['off','GFX✕']],'gfx','rs50-gfx','on');
+/* 연결 표시: 핑에 응답한 화면을 점등 */
+const seen={};
+if(BUS){
+  BUS.onmessage=e=>{const d=e.data||{};if(d.pong)seen[d.pong]=Date.now();};
+  setInterval(()=>{
+    BUS.postMessage({ping:1});
+    const now=Date.now();
+    $('lvL').classList.toggle('on',now-(seen.left||0)<2500);
+    $('lvR').classList.toggle('on',now-(seen.right||0)<2500);
+  },1000);
+}
+</script></body></html>"""
+
+
 def _side_page(side):
     label = "LEFT" if side == "left" else "RIGHT"
     flexdir = "row" if side == "left" else "row-reverse"
@@ -1477,6 +1605,9 @@ class WebUI(threading.Thread):
                     ctype = "text/html; charset=utf-8"
                 elif path in ("/left", "/right"):
                     body = _side_page(path[1:]).encode()
+                    ctype = "text/html; charset=utf-8"
+                elif path == "/config":
+                    body = CONFIG_TMPL.encode()
                     ctype = "text/html; charset=utf-8"
                 else:
                     self.send_response(404)

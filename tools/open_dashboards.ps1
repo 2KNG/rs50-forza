@@ -17,6 +17,13 @@ function Open-Side($url, $scr) {
         "--window-size=$($b.Width),$($b.Height)")
 }
 
+# 설정 창을 먼저 띄운다 (뒤로 깔림 — 필요할 때 Alt+Tab으로 사용)
+Start-Process msedge -ArgumentList @(
+    "--new-window", "--app=http://127.0.0.1:8777/config",
+    "--window-position=$($primary.Bounds.X + 120),$($primary.Bounds.Y + 120)",
+    "--window-size=900,760")
+Start-Sleep -Milliseconds 600
+
 Open-Side "http://127.0.0.1:8777/left"  $left
 Open-Side "http://127.0.0.1:8777/right" $right
 # 사이드 모니터가 없으면 통합 대시보드로 폴백
