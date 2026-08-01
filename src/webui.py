@@ -1134,6 +1134,10 @@ function render(ts){
      0.1s 상한을 그대로 쓰면 트립/평균속도가 실제의 10%만 쌓인다 */
   const dt=prevTs===null?1/60:Math.min(0.1,Math.max(0.001,(ts-prevTs)/1000));
   prevTs=ts;
+  /* 적분용 dt: 창이 가려져 프레임이 1Hz로 떨어져도 실경과를 반영해야 하므로
+     시각 스무딩용 dt(상한 0.1s)와 분리한다. 반드시 사용처보다 먼저 선언할 것 */
+  const rdt=lastTs===null?1/60:Math.min(2,Math.max(0.001,(ts-lastTs)/1000));
+  lastTs=ts;
   const k=1-Math.exp(-dt*9);
   for(const key in D)if(!isFinite(D[key]))D[key]=0;  // 오염 복구
   D.speed=Math.min(600,Math.max(0,D.speed));D.ratio=Math.min(1.5,Math.max(0,D.ratio));
@@ -1203,8 +1207,6 @@ function render(ts){
     $('gvT').style.opacity=Math.max(0,Math.min(1,(-D.longg-0.35)/1.1))*.45;
     $('gvB').style.opacity=Math.max(0,Math.min(1,(D.longg-0.3)/1.2))*.3;
   }
-  const rdt=prevTs===null?1/60:Math.min(2,Math.max(0.001,(ts-lastTs)/1000));
-  lastTs=ts;
   if(T.alive)trip+=D.speed/3.6*rdt/1000;   /* km — 실경과 기준 */
   driftScore(dt);
   sampleAndDraw(ts);
